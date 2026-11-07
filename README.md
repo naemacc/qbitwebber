@@ -29,8 +29,9 @@ A modified fork of [ksuaning-au/qbitwebber](https://github.com/ksuaning-au/qbitw
 
 ## Installation
 
-1. In qBittorrent, go to **Options > Web UI > Use alternative Web UI** and set the path to this repo's `public` folder.
-2. (Optional, Windows only) Set up the open folder button, see below.
+1. Download the ..
+2. In qBittorrent, go to **Options > Web UI > Use alternative Web UI** and set the path to this repo's `qbitwebber` folder.
+3. (Optional, Windows only) Set up the open folder button, see below.
 
 ## Open folder button setup (Windows)
 
