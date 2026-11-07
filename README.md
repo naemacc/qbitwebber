@@ -29,7 +29,7 @@ A modified fork of [ksuaning-au/qbitwebber](https://github.com/ksuaning-au/qbitw
 
 ## Installation
 
-1. Download the ..
+1. Download the zipped folder from the release page or clone the repo
 2. In qBittorrent, go to **Options > Web UI > Use alternative Web UI** and set the path to this repo's `qbitwebber` folder.
 3. (Optional, Windows only) Set up the open folder button, see below.
 
