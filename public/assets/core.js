@@ -24983,8 +24983,8 @@ function NA() {
     i = vA(),
     c = hA(),
     [f, h] = b.useState(new Set()),
-    [m, y] = b.useState("name"),
-    [p, x] = b.useState("asc"),
+    [m, y] = b.useState("added_on"),
+    [p, x] = b.useState("desc"),
     [g, w] = b.useState(1),
     [C, E] = b.useState(null),
     [_, O] = b.useState(null),
@@ -26397,8 +26397,10 @@ function MA() {
     [s, i] = b.useState([]),
     [c, f] = b.useState(!1),
     [h, m] = b.useState(!1),
-    [y, p] = b.useState("nbSeeders"),
-    [x, g] = b.useState("desc"),
+    [y, p] = b.useState([
+      { k: "pubDate", d: "desc" },
+      { k: "nbSeeders", d: "desc" },
+    ]),
     [w, C] = b.useState(1),
     [E, _] = b.useState(null),
     [O, j] = b.useState(!1),
@@ -26455,21 +26457,34 @@ function MA() {
     H = b.useMemo(
       () =>
         [...s].sort((k, Z) => {
-          let $ = k[y],
-            X = Z[y];
-          y === "pubDate" && (($ = $ > 0 ? $ : 0), (X = X > 0 ? X : 0));
-          return (
+          for (const S of y) {
+            let $ = k[S.k],
+              X = Z[S.k];
+            S.k === "pubDate" && (($ = $ > 0 ? $ : 0), (X = X > 0 ? X : 0));
             typeof $ == "string" &&
-              (($ = $.toLowerCase()), (X = X.toLowerCase())),
-            $ < X ? (x === "asc" ? -1 : 1) : $ > X ? (x === "asc" ? 1 : -1) : 0
-          );
+              (($ = $.toLowerCase()), (X = (X ?? "").toLowerCase()));
+            if ($ < X) return S.d === "asc" ? -1 : 1;
+            if ($ > X) return S.d === "asc" ? 1 : -1;
+          }
+          return 0;
         }),
-      [s, y, x],
+      [s, y],
     ),
     le = Math.ceil(H.length / Os),
     re = H.slice((w - 1) * Os, w * Os),
     ie = (k) => {
-      y === k ? g(x === "asc" ? "desc" : "asc") : (p(k), g("desc"));
+      (p((S) => {
+        const I = S.findIndex((e) => e.k === k);
+        if (I === 0)
+          return [{ k, d: S[0].d === "asc" ? "desc" : "asc" }, ...S.slice(1)];
+        const R = I > 0 ? S[I] : { k, d: "desc" };
+        return [R, S[0]];
+      }),
+        C(1));
+    },
+    ind = (k) => {
+      const I = y.findIndex((e) => e.k === k);
+      return I < 0 ? "" : (y[I].d === "asc" ? "↑" : "↓") + (I + 1);
     },
     be = async () => {
       if (E?.fileUrl) {
@@ -26486,12 +26501,22 @@ function MA() {
         }
       }
     },
-    ye = ({ field: k }) =>
-      y !== k
+    ye = ({ field: k }) => {
+      const I = y.findIndex((e) => e.k === k);
+      return I < 0
         ? d.jsx(zo, { className: "h-4 w-4 ml-1 inline opacity-50" })
-        : x === "asc"
-          ? d.jsx(Y0, { className: "h-4 w-4 ml-1 inline" })
-          : d.jsx(G0, { className: "h-4 w-4 ml-1 inline" }),
+        : d.jsxs(d.Fragment, {
+            children: [
+              y[I].d === "asc"
+                ? d.jsx(Y0, { className: "h-4 w-4 ml-1 inline" })
+                : d.jsx(G0, { className: "h-4 w-4 ml-1 inline" }),
+              d.jsx("span", {
+                className: "text-[10px] align-top opacity-70",
+                children: I + 1,
+              }),
+            ],
+          });
+    },
     M = {
       fileName: "Name",
       fileSize: "Size",
@@ -26571,8 +26596,9 @@ function MA() {
                         children: [
                           d.jsx(zo, { className: "h-4 w-4 mr-2" }),
                           "Sort: ",
-                          M[y],
-                          x === "asc" ? " ↑" : " ↓",
+                          y
+                            .map((e) => M[e.k] + (e.d === "asc" ? " ↑" : " ↓"))
+                            .join(" + "),
                         ],
                       }),
                     }),
@@ -26581,45 +26607,27 @@ function MA() {
                       children: [
                         d.jsxs(zt, {
                           onClick: () => ie("fileName"),
-                          children: [
-                            "Name ",
-                            y === "fileName" && (x === "asc" ? "↑" : "↓"),
-                          ],
+                          children: ["Name ", ind("fileName")],
                         }),
                         d.jsxs(zt, {
                           onClick: () => ie("fileSize"),
-                          children: [
-                            "Size ",
-                            y === "fileSize" && (x === "asc" ? "↑" : "↓"),
-                          ],
+                          children: ["Size ", ind("fileSize")],
                         }),
                         d.jsxs(zt, {
                           onClick: () => ie("nbSeeders"),
-                          children: [
-                            "Seeds ",
-                            y === "nbSeeders" && (x === "asc" ? "↑" : "↓"),
-                          ],
+                          children: ["Seeds ", ind("nbSeeders")],
                         }),
                         d.jsxs(zt, {
                           onClick: () => ie("nbLeechers"),
-                          children: [
-                            "Leeches ",
-                            y === "nbLeechers" && (x === "asc" ? "↑" : "↓"),
-                          ],
+                          children: ["Leeches ", ind("nbLeechers")],
                         }),
                         d.jsxs(zt, {
                           onClick: () => ie("siteUrl"),
-                          children: [
-                            "Source ",
-                            y === "siteUrl" && (x === "asc" ? "↑" : "↓"),
-                          ],
+                          children: ["Source ", ind("siteUrl")],
                         }),
                         d.jsxs(zt, {
                           onClick: () => ie("pubDate"),
-                          children: [
-                            "Date ",
-                            y === "pubDate" && (x === "asc" ? "↑" : "↓"),
-                          ],
+                          children: ["Date ", ind("pubDate")],
                         }),
                       ],
                     }),
@@ -27094,53 +27102,71 @@ function zA(n) {
 }
 function kA() {
   const { data: n, isLoading: l } = SA();
-  return l
-    ? d.jsx("div", {
-        className: "text-center py-8 text-muted-foreground",
-        children: "Loading logs...",
-      })
-    : !n || n.length === 0
+  return (
+    b.useEffect(() => {
+      const H = document.documentElement,
+        le = document.body,
+        re = [H.style.overflow, le.style.overflow];
+      return (
+        (H.style.overflow = "hidden"),
+        (le.style.overflow = "hidden"),
+        () => {
+          ((H.style.overflow = re[0]), (le.style.overflow = re[1]));
+        }
+      );
+    }, []),
+    l
       ? d.jsx("div", {
           className: "text-center py-8 text-muted-foreground",
-          children: "No logs",
+          children: "Loading logs...",
         })
-      : d.jsxs(jt, {
-          children: [
-            d.jsx(Un, { children: d.jsx(Ln, { children: "Logs" }) }),
-            d.jsx(Tt, {
-              className: "p-0",
-              children: d.jsx(OA, {
-                className: "h-[calc(100vh-200px)]",
-                children: d.jsx("div", {
-                  className: "p-4 space-y-1",
-                  children: n
-                    .slice(-100)
-                    .reverse()
-                    .map((s) =>
-                      d.jsxs(
-                        "div",
-                        {
-                          className: "flex items-start gap-2 py-1 text-xs",
-                          children: [
-                            d.jsx("span", {
-                              className:
-                                "text-muted-foreground text-xs whitespace-nowrap",
-                              children: zA(s.timestamp),
-                            }),
-                            d.jsx("span", {
-                              className: "break-all text-xs",
-                              children: s.message,
-                            }),
-                          ],
-                        },
-                        s.id,
-                      ),
-                    ),
+      : !n || n.length === 0
+        ? d.jsx("div", {
+            className: "text-center py-8 text-muted-foreground",
+            children: "No logs",
+          })
+        : d.jsx("div", {
+            className: "h-[calc(100dvh-136px)] md:h-[calc(100dvh-88px)]",
+            children: d.jsxs(jt, {
+              className: "h-full overflow-hidden",
+              children: [
+                d.jsx(Un, { children: d.jsx(Ln, { children: "Logs" }) }),
+                d.jsx(Tt, {
+                  className: "p-0 relative flex-1 min-h-0",
+                  children: d.jsx(OA, {
+                    className: "absolute inset-0",
+                    children: d.jsx("div", {
+                      className: "p-4 space-y-1",
+                      children: n
+                        .slice(-100)
+                        .reverse()
+                        .map((s) =>
+                          d.jsxs(
+                            "div",
+                            {
+                              className: "flex items-start gap-2 py-1 text-xs",
+                              children: [
+                                d.jsx("span", {
+                                  className:
+                                    "text-muted-foreground text-xs whitespace-nowrap",
+                                  children: zA(s.timestamp),
+                                }),
+                                d.jsx("span", {
+                                  className: "break-all text-xs",
+                                  children: s.message,
+                                }),
+                              ],
+                            },
+                            s.id,
+                          ),
+                        ),
+                    }),
+                  }),
                 }),
-              }),
+              ],
             }),
-          ],
-        });
+          })
+  );
 }
 function UA({ className: n, orientation: l = "horizontal", ...s }) {
   return d.jsx(vT, {
