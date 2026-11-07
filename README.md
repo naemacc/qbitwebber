@@ -63,4 +63,4 @@ powershell -ExecutionPolicy Bypass -File .\install-qbitopen.ps1 -Uninstall
 
 ## Disclaimer
 
-As in the original: this is a minimal UI and is likely missing things, and you should only ever use it to download Linux distros and nothing else.
+As in the original: this is a minimal UI and is likely missing things.
