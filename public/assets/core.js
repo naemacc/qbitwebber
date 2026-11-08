@@ -17644,7 +17644,7 @@ var F2 = function () {
             .join(""),
           `
   }
-
+  
   .`,
         )
         .concat(
@@ -17657,7 +17657,7 @@ var F2 = function () {
           i,
           `;
   }
-
+  
   .`,
         )
         .concat(
@@ -17670,7 +17670,7 @@ var F2 = function () {
           i,
           `;
   }
-
+  
   .`,
         )
         .concat(bo, " .")
@@ -17683,7 +17683,7 @@ var F2 = function () {
           i,
           `;
   }
-
+  
   .`,
         )
         .concat(xo, " .")
@@ -17696,7 +17696,7 @@ var F2 = function () {
           i,
           `;
   }
-
+  
   body[`,
         )
         .concat(
@@ -24966,12 +24966,11 @@ function qbOpenFolder(t) {
     return;
   }
   try {
-    const a = document.createElement("a");
-    ((a.href = "qbitopen:" + encodeURIComponent(p)),
-      (a.style.display = "none"),
-      document.body.appendChild(a),
-      a.click(),
-      a.remove(),
+    const f = document.createElement("iframe");
+    ((f.style.display = "none"),
+      (f.src = "qbitopen:" + encodeURIComponent(p)),
+      document.body.appendChild(f),
+      setTimeout(() => f.remove(), 3e3),
       nt.info("Opening in File Explorer..."));
   } catch {
     nt.error("Could not open File Explorer");
@@ -24988,6 +24987,9 @@ function NA() {
     [g, w] = b.useState(1),
     [C, E] = b.useState(null),
     [_, O] = b.useState(null),
+    [qbDel, qbSetDel] = b.useState(null),
+    qbAsk = (hashes, label, files, bulk) =>
+      qbSetDel({ hashes, label, files: !!files, bulk: !!bulk }),
     j = b.useMemo(
       () =>
         n
@@ -25051,7 +25053,12 @@ function NA() {
       (i.mutate(Array.from(f)), h(new Set()));
     },
     te = (H) => {
-      (c.mutate({ hashes: Array.from(f), deleteFiles: H }), h(new Set()));
+      qbAsk(
+        Array.from(f),
+        f.size === 1 ? "this torrent" : f.size + " torrents",
+        H,
+        !0,
+      );
     };
   b.useEffect(() => {
     A > 0 && g > A && w(A);
@@ -25469,18 +25476,12 @@ function NA() {
                                               children: [
                                                 d.jsx(zt, {
                                                   onClick: () =>
-                                                    c.mutate({
-                                                      hashes: [H.hash],
-                                                      deleteFiles: !1,
-                                                    }),
+                                                    qbAsk([H.hash], H.name, !1),
                                                   children: "Delete",
                                                 }),
                                                 d.jsx(zt, {
                                                   onClick: () =>
-                                                    c.mutate({
-                                                      hashes: [H.hash],
-                                                      deleteFiles: !0,
-                                                    }),
+                                                    qbAsk([H.hash], H.name, !0),
                                                   className: "text-destructive",
                                                   children: "Delete + Files",
                                                 }),
@@ -25703,8 +25704,7 @@ function NA() {
                               variant: "ghost",
                               size: "icon",
                               className: "h-7 w-7",
-                              onClick: () =>
-                                c.mutate({ hashes: [H.hash], deleteFiles: !1 }),
+                              onClick: () => qbAsk([H.hash], H.name, !1),
                               children: d.jsx(zs, { className: "h-3 w-3" }),
                             }),
                           ],
@@ -25753,6 +25753,66 @@ function NA() {
               torrent: C,
               open: !!C,
               onOpenChange: (H) => !H && E(null),
+            }),
+            d.jsx(Wo, {
+              open: !!qbDel,
+              onOpenChange: (H) => !H && qbSetDel(null),
+              children: d.jsxs(ec, {
+                className: "sm:max-w-md",
+                children: [
+                  d.jsxs(tc, {
+                    children: [
+                      d.jsx(nc, { children: "Delete torrent?" }),
+                      d.jsx(W0, {
+                        className: "break-all",
+                        children: qbDel ? qbDel.label : "",
+                      }),
+                    ],
+                  }),
+                  d.jsxs("div", {
+                    className: "flex items-center gap-2",
+                    children: [
+                      d.jsx(ln, {
+                        id: "qb-del-files",
+                        checked: !!qbDel?.files,
+                        onCheckedChange: (H) =>
+                          qbSetDel((le) => le && { ...le, files: H === !0 }),
+                      }),
+                      d.jsx(Le, {
+                        htmlFor: "qb-del-files",
+                        children: "Also delete downloaded files",
+                      }),
+                    ],
+                  }),
+                  qbDel?.files &&
+                    d.jsx("p", {
+                      className: "text-sm text-destructive",
+                      children:
+                        "The files will be permanently deleted from disk.",
+                    }),
+                  d.jsxs(J0, {
+                    children: [
+                      d.jsx(Se, {
+                        variant: "outline",
+                        onClick: () => qbSetDel(null),
+                        children: "Cancel",
+                      }),
+                      d.jsx(Se, {
+                        variant: "destructive",
+                        onClick: () => {
+                          (c.mutate({
+                            hashes: qbDel.hashes,
+                            deleteFiles: qbDel.files,
+                          }),
+                            qbDel.bulk && h(new Set()),
+                            qbSetDel(null));
+                        },
+                        children: qbDel?.files ? "Delete + Files" : "Delete",
+                      }),
+                    ],
+                  }),
+                ],
+              }),
             }),
           ],
         });

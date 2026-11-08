@@ -7,6 +7,7 @@ A modified fork of [ksuaning-au/qbitwebber](https://github.com/ksuaning-au/qbitw
 ## Changes from the original
 
 - **Open folder button** on each torrent. It opens the torrent's location in Windows File Explorer (the file is highlighted if the torrent is a single file). Requires the one-time setup below.
+- **Delete confirmation**: deleting a torrent (single or bulk) now asks first, with an **Also delete downloaded files** checkbox. Previously delete had no confirmation.
 - **Torrent list** now defaults to sorting by **Added, newest first** (was Name, A to Z).
 - **Search page** now supports **two-level sorting**, defaulting to **Date descending, then Seeds descending** (was Seeds only).
   - Click a column header to make it the primary sort. The previous primary becomes the secondary.
