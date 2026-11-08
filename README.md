@@ -10,7 +10,8 @@ A modified fork of [ksuaning-au/qbitwebber](https://github.com/ksuaning-au/qbitw
 - **Delete confirmation**: deleting a torrent (single or bulk) now asks first, with an **Also delete downloaded files** checkbox. Previously delete had no confirmation.
 - **Torrent list** now defaults to sorting by **Added, newest first** (was Name, A to Z).
 - **Search page** now supports **two-level sorting**, defaulting to **Date descending, then Seeds descending** (was Seeds only).
-  - Two side-by-side dropdowns above the results (1st and 2nd) let you pick each sort field, each with its own direction toggle. This works on desktop and mobile.
+  - Two side-by-side dropdowns above the results let you pick the primary and secondary sort field, each with its own direction toggle. This works on desktop and mobile.
+  - Dates are compared by calendar day, so the second sort breaks ties between results from the same day (for example, Date then Seeds ranks same-day results by seeds).
   - Clicking a table column header also works: it becomes the primary sort and the previous primary becomes the secondary. Headers show a small `1` / `2` next to the arrow.
 - **Logs page** fixed: the page itself no longer scrolls. It fits the screen and only the log panel scrolls.
 - **Settings** fixes:

@@ -26525,7 +26525,16 @@ function MA() {
           for (const S of y) {
             let $ = k[S.k],
               X = Z[S.k];
-            S.k === "pubDate" && (($ = $ > 0 ? $ : 0), (X = X > 0 ? X : 0));
+            if (S.k === "pubDate") {
+              const qbDay = (t) => {
+                if (!(t > 0)) return 0;
+                const D = new Date(t > 1e11 ? t : t * 1e3);
+                return (
+                  D.getFullYear() * 1e4 + (D.getMonth() + 1) * 100 + D.getDate()
+                );
+              };
+              (($ = qbDay($)), (X = qbDay(X)));
+            }
             typeof $ == "string" &&
               (($ = $.toLowerCase()), (X = (X ?? "").toLowerCase()));
             if ($ < X) return S.d === "asc" ? -1 : 1;
@@ -26579,11 +26588,7 @@ function MA() {
                 children: d.jsxs(Se, {
                   variant: "outline",
                   size: "sm",
-                  children: [
-                    slot === 0 ? "1st: " : "2nd: ",
-                    M[y[slot].k],
-                    d.jsx(zo, { className: "h-4 w-4 ml-1" }),
-                  ],
+                  children: M[y[slot].k],
                 }),
               }),
               d.jsx(tf, {
@@ -27193,18 +27198,27 @@ function zA(n) {
 }
 function kA() {
   const { data: n, isLoading: l } = SA(),
-    [qbWide, qbSetWide] = b.useState(
-      () => window.matchMedia("(min-width: 768px)").matches,
-    );
+    qbRef = b.useRef(null),
+    [qbH, qbSetH] = b.useState(null);
   return (
     b.useEffect(() => {
-      const mq = window.matchMedia("(min-width: 768px)"),
-        fn = () => qbSetWide(mq.matches);
+      const fit = () => {
+        const el = qbRef.current;
+        if (!el) return;
+        const nav = document.querySelector("nav.fixed"),
+          navH =
+            nav && getComputedStyle(nav).display !== "none"
+              ? nav.offsetHeight
+              : 0,
+          top = el.getBoundingClientRect().top + window.scrollY;
+        qbSetH(Math.max(200, window.innerHeight - top - navH - 16));
+      };
       return (
-        mq.addEventListener("change", fn),
-        () => mq.removeEventListener("change", fn)
+        fit(),
+        window.addEventListener("resize", fit),
+        () => window.removeEventListener("resize", fit)
       );
-    }, []),
+    }, [l, n]),
     b.useEffect(() => {
       const H = document.documentElement,
         le = document.body,
@@ -27228,7 +27242,8 @@ function kA() {
           children: "No logs",
         })
       : d.jsx("div", {
-          style: { height: `calc(100dvh - ${qbWide ? 88 : 136}px)` },
+          ref: qbRef,
+          style: { height: qbH ?? "calc(100dvh - 160px)" },
           children: d.jsxs(jt, {
           style: { height: "100%", overflow: "hidden" },
           children: [
