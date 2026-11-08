@@ -10,10 +10,13 @@ A modified fork of [ksuaning-au/qbitwebber](https://github.com/ksuaning-au/qbitw
 - **Delete confirmation**: deleting a torrent (single or bulk) now asks first, with an **Also delete downloaded files** checkbox. Previously delete had no confirmation.
 - **Torrent list** now defaults to sorting by **Added, newest first** (was Name, A to Z).
 - **Search page** now supports **two-level sorting**, defaulting to **Date descending, then Seeds descending** (was Seeds only).
-  - Click a column header to make it the primary sort. The previous primary becomes the secondary.
-  - Clicking the current primary flips its direction. Clicking the secondary promotes it to primary.
-  - Headers show a small `1` / `2` next to the arrow. On mobile the sort menu shows the same markers.
+  - Two side-by-side dropdowns above the results (1st and 2nd) let you pick each sort field, each with its own direction toggle. This works on desktop and mobile.
+  - Clicking a table column header also works: it becomes the primary sort and the previous primary becomes the secondary. Headers show a small `1` / `2` next to the arrow.
 - **Logs page** fixed: the page itself no longer scrolls. It fits the screen and only the log panel scrolls.
+- **Settings** fixes:
+  - **Start paused** and **Create subfolder** now work on current qBittorrent (5.x / 4.6+), which renamed the underlying settings. Older versions still work.
+  - The **Theme** button now shows the theme actually in use. Before, it showed "Light" while the UI was dark whenever the theme was set to follow the system.
+  - After saving, the page re-reads qBittorrent's settings and shows a warning if any saved value was not applied.
 - **RSS page** reworked:
   - Articles are sorted newest first, with unread counts per feed and in the feed list.
   - Each article has a download button, and downloading marks it as read.

@@ -13720,11 +13720,13 @@ var Q1 = class extends Rr {
       this.#t.setOptions(this.options),
       l._defaulted &&
         !wo(this.options, l) &&
-        this.#e.getQueryCache().notify({
-          type: "observerOptionsUpdated",
-          query: this.#t,
-          observer: this,
-        }));
+        this.#e
+          .getQueryCache()
+          .notify({
+            type: "observerOptionsUpdated",
+            query: this.#t,
+            observer: this,
+          }));
     const i = this.hasListeners();
     (i && $v(this.#t, s, this.options, l) && this.#d(),
       this.updateResult(),
@@ -14404,11 +14406,13 @@ var J1 = class extends Rr {
       const s = this.options;
       ((this.options = this.#e.defaultMutationOptions(l)),
         wo(this.options, s) ||
-          this.#e.getMutationCache().notify({
-            type: "observerOptionsUpdated",
-            mutation: this.#n,
-            observer: this,
-          }),
+          this.#e
+            .getMutationCache()
+            .notify({
+              type: "observerOptionsUpdated",
+              mutation: this.#n,
+              observer: this,
+            }),
         s?.mutationKey &&
         this.options.mutationKey &&
         _l(s.mutationKey) !== _l(this.options.mutationKey)
@@ -24478,26 +24482,28 @@ function wA({ activeTab: n, onTabChange: l, children: s }) {
           "md:hidden fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur",
         children: d.jsx("div", {
           className: "flex justify-around py-2",
-          children: m.slice(0, 5).map((y) =>
-            d.jsxs(
-              "button",
-              {
-                className: Be(
-                  "flex flex-col items-center gap-1 px-3 py-1 rounded-md",
-                  n === y.id ? "text-primary" : "text-muted-foreground",
-                ),
-                onClick: () => l(y.id),
-                children: [
-                  y.icon,
-                  d.jsx("span", {
-                    className: "text-[10px]",
-                    children: y.label,
-                  }),
-                ],
-              },
-              y.id,
+          children: m
+            .slice(0, 5)
+            .map((y) =>
+              d.jsxs(
+                "button",
+                {
+                  className: Be(
+                    "flex flex-col items-center gap-1 px-3 py-1 rounded-md",
+                    n === y.id ? "text-primary" : "text-muted-foreground",
+                  ),
+                  onClick: () => l(y.id),
+                  children: [
+                    y.icon,
+                    d.jsx("span", {
+                      className: "text-[10px]",
+                      children: y.label,
+                    }),
+                  ],
+                },
+                y.id,
+              ),
             ),
-          ),
         }),
       }),
     ],
@@ -25787,8 +25793,7 @@ function NA() {
                   qbDel?.files &&
                     d.jsx("p", {
                       className: "text-sm text-destructive",
-                      children:
-                        "The files will be permanently deleted from disk.",
+                      children: "The files will be permanently deleted from disk.",
                     }),
                   d.jsxs(J0, {
                     children: [
@@ -26542,6 +26547,69 @@ function MA() {
       }),
         C(1));
     },
+    qbSetSlot = (slot, k) => {
+      (p((S) => {
+        const o = 1 - slot,
+          N = [...S];
+        return (
+          S[o].k === k
+            ? ((N[slot] = { k, d: S[slot].d }), (N[o] = { k: S[slot].k, d: S[o].d }))
+            : (N[slot] = { k, d: S[slot].d }),
+          N
+        );
+      }),
+        C(1));
+    },
+    qbFlip = (slot) => {
+      (p((S) =>
+        S.map((e, i) =>
+          i === slot ? { ...e, d: e.d === "asc" ? "desc" : "asc" } : e,
+        ),
+      ),
+        C(1));
+    },
+    qbPick = (slot) =>
+      d.jsxs("div", {
+        style: { display: "flex", alignItems: "center", gap: 4 },
+        children: [
+          d.jsxs(Wd, {
+            children: [
+              d.jsx(ef, {
+                asChild: !0,
+                children: d.jsxs(Se, {
+                  variant: "outline",
+                  size: "sm",
+                  children: [
+                    slot === 0 ? "1st: " : "2nd: ",
+                    M[y[slot].k],
+                    d.jsx(zo, { className: "h-4 w-4 ml-1" }),
+                  ],
+                }),
+              }),
+              d.jsx(tf, {
+                align: "start",
+                children: Object.keys(M).map((k) =>
+                  d.jsx(
+                    zt,
+                    {
+                      onClick: () => qbSetSlot(slot, k),
+                      children: M[k] + (y[slot].k === k ? " ✓" : ""),
+                    },
+                    k,
+                  ),
+                ),
+              }),
+            ],
+          }),
+          d.jsx(Se, {
+            variant: "outline",
+            size: "sm",
+            title: "Toggle direction",
+            onClick: () => qbFlip(slot),
+            children: y[slot].d === "asc" ? "↑" : "↓",
+          }),
+        ],
+      }),
     ind = (k) => {
       const I = y.findIndex((e) => e.k === k);
       return I < 0 ? "" : (y[I].d === "asc" ? "↑" : "↓") + (I + 1);
@@ -26571,7 +26639,7 @@ function MA() {
                 ? d.jsx(Y0, { className: "h-4 w-4 ml-1 inline" })
                 : d.jsx(G0, { className: "h-4 w-4 ml-1 inline" }),
               d.jsx("span", {
-                className: "text-[10px] align-top opacity-70",
+                style: { fontSize: 10, verticalAlign: "top", opacity: 0.7 },
                 children: I + 1,
               }),
             ],
@@ -26640,58 +26708,21 @@ function MA() {
         d.jsxs(d.Fragment, {
           children: [
             d.jsxs("div", {
-              className: "md:hidden flex items-center justify-between",
+              style: {
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              },
               children: [
                 d.jsxs("span", {
                   className: "text-sm text-muted-foreground",
                   children: [H.length, " results"],
                 }),
-                d.jsxs(Wd, {
-                  children: [
-                    d.jsx(ef, {
-                      asChild: !0,
-                      children: d.jsxs(Se, {
-                        variant: "outline",
-                        size: "sm",
-                        children: [
-                          d.jsx(zo, { className: "h-4 w-4 mr-2" }),
-                          "Sort: ",
-                          y
-                            .map((e) => M[e.k] + (e.d === "asc" ? " ↑" : " ↓"))
-                            .join(" + "),
-                        ],
-                      }),
-                    }),
-                    d.jsxs(tf, {
-                      align: "end",
-                      children: [
-                        d.jsxs(zt, {
-                          onClick: () => ie("fileName"),
-                          children: ["Name ", ind("fileName")],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => ie("fileSize"),
-                          children: ["Size ", ind("fileSize")],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => ie("nbSeeders"),
-                          children: ["Seeds ", ind("nbSeeders")],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => ie("nbLeechers"),
-                          children: ["Leeches ", ind("nbLeechers")],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => ie("siteUrl"),
-                          children: ["Source ", ind("siteUrl")],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => ie("pubDate"),
-                          children: ["Date ", ind("pubDate")],
-                        }),
-                      ],
-                    }),
-                  ],
+                d.jsxs("div", {
+                  style: { display: "flex", flexWrap: "wrap", gap: 8 },
+                  children: [qbPick(0), qbPick(1)],
                 }),
               ],
             }),
@@ -27161,8 +27192,19 @@ function zA(n) {
   return new Date(n > 1e11 ? n : n * 1e3).toLocaleTimeString();
 }
 function kA() {
-  const { data: n, isLoading: l } = SA();
+  const { data: n, isLoading: l } = SA(),
+    [qbWide, qbSetWide] = b.useState(
+      () => window.matchMedia("(min-width: 768px)").matches,
+    );
   return (
+    b.useEffect(() => {
+      const mq = window.matchMedia("(min-width: 768px)"),
+        fn = () => qbSetWide(mq.matches);
+      return (
+        mq.addEventListener("change", fn),
+        () => mq.removeEventListener("change", fn)
+      );
+    }, []),
     b.useEffect(() => {
       const H = document.documentElement,
         le = document.body,
@@ -27176,56 +27218,64 @@ function kA() {
       );
     }, []),
     l
+    ? d.jsx("div", {
+        className: "text-center py-8 text-muted-foreground",
+        children: "Loading logs...",
+      })
+    : !n || n.length === 0
       ? d.jsx("div", {
           className: "text-center py-8 text-muted-foreground",
-          children: "Loading logs...",
+          children: "No logs",
         })
-      : !n || n.length === 0
-        ? d.jsx("div", {
-            className: "text-center py-8 text-muted-foreground",
-            children: "No logs",
-          })
-        : d.jsx("div", {
-            className: "h-[calc(100dvh-136px)] md:h-[calc(100dvh-88px)]",
-            children: d.jsxs(jt, {
-              className: "h-full overflow-hidden",
-              children: [
-                d.jsx(Un, { children: d.jsx(Ln, { children: "Logs" }) }),
-                d.jsx(Tt, {
-                  className: "p-0 relative flex-1 min-h-0",
-                  children: d.jsx(OA, {
-                    className: "absolute inset-0",
-                    children: d.jsx("div", {
-                      className: "p-4 space-y-1",
-                      children: n
-                        .slice(-100)
-                        .reverse()
-                        .map((s) =>
-                          d.jsxs(
-                            "div",
-                            {
-                              className: "flex items-start gap-2 py-1 text-xs",
-                              children: [
-                                d.jsx("span", {
-                                  className:
-                                    "text-muted-foreground text-xs whitespace-nowrap",
-                                  children: zA(s.timestamp),
-                                }),
-                                d.jsx("span", {
-                                  className: "break-all text-xs",
-                                  children: s.message,
-                                }),
-                              ],
-                            },
-                            s.id,
-                          ),
-                        ),
-                    }),
-                  }),
+      : d.jsx("div", {
+          style: { height: `calc(100dvh - ${qbWide ? 88 : 136}px)` },
+          children: d.jsxs(jt, {
+          style: { height: "100%", overflow: "hidden" },
+          children: [
+            d.jsx(Un, { children: d.jsx(Ln, { children: "Logs" }) }),
+            d.jsx(Tt, {
+              className: "p-0",
+              style: { position: "relative", flex: "1 1 0%", minHeight: 0 },
+              children: d.jsx("div", {
+                style: {
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  left: 0,
+                  overflowY: "auto",
+                },
+                children: d.jsx("div", {
+                  className: "p-4 space-y-1",
+                  children: n
+                    .slice(-100)
+                    .reverse()
+                    .map((s) =>
+                      d.jsxs(
+                        "div",
+                        {
+                          className: "flex items-start gap-2 py-1 text-xs",
+                          children: [
+                            d.jsx("span", {
+                              className:
+                                "text-muted-foreground text-xs whitespace-nowrap",
+                              children: zA(s.timestamp),
+                            }),
+                            d.jsx("span", {
+                              className: "break-all text-xs",
+                              children: s.message,
+                            }),
+                          ],
+                        },
+                        s.id,
+                      ),
+                    ),
                 }),
-              ],
+              }),
             }),
-          })
+          ],
+        }),
+        })
   );
 }
 function UA({ className: n, orientation: l = "horizontal", ...s }) {
@@ -27303,7 +27353,8 @@ const Fg = {
 };
 function HA() {
   const { logout: n, username: l } = Lo(),
-    { theme: s, setTheme: i } = E1(),
+    { theme: qbT0, resolvedTheme: qbRes, setTheme: i } = E1(),
+    s = qbRes ?? qbT0,
     [c, f] = b.useState(Fg),
     [h, m] = b.useState(!0),
     [y, p] = b.useState(!1),
@@ -27314,10 +27365,18 @@ function HA() {
   }, []);
   const E = async () => {
       try {
-        const A = await ze.getPreferences();
+        const A = await ze.getPreferences(),
+          qbCsf =
+            "torrent_content_layout" in A
+              ? A.torrent_content_layout === "Subfolder"
+              : (A.create_subfolder_enabled ?? !0);
         f({
           ...Fg,
           ...A,
+          start_paused_enabled:
+            A.add_stopped_enabled ?? A.start_paused_enabled ?? !1,
+          create_subfolder_enabled: qbCsf,
+          _csf0: qbCsf,
           dl_limit: A.dl_limit > 0 ? Math.round(A.dl_limit / 1024) : A.dl_limit,
           up_limit: A.up_limit > 0 ? Math.round(A.up_limit / 1024) : A.up_limit,
           alt_dl_limit:
@@ -27346,8 +27405,15 @@ function HA() {
               (z.save_path = c.save_path),
               (z.temp_path = c.temp_path),
               (z.temp_path_enabled = c.temp_path_enabled),
-              (z.create_subfolder_enabled = c.create_subfolder_enabled),
-              (z.start_paused_enabled = c.start_paused_enabled),
+              "torrent_content_layout" in c
+                ? c.create_subfolder_enabled !== c._csf0 &&
+                  (z.torrent_content_layout = c.create_subfolder_enabled
+                    ? "Subfolder"
+                    : "NoSubfolder")
+                : (z.create_subfolder_enabled = c.create_subfolder_enabled),
+              "add_stopped_enabled" in c
+                ? (z.add_stopped_enabled = c.start_paused_enabled)
+                : (z.start_paused_enabled = c.start_paused_enabled),
               (z.auto_tmm_enabled = c.auto_tmm_enabled));
             break;
           case "queueing":
@@ -27374,10 +27440,30 @@ function HA() {
               (z.encryption = c.encryption));
             break;
         }
-        (await ze.setPreferences(z),
-          nt.success(
-            `${A.charAt(0).toUpperCase() + A.slice(1)} settings saved`,
-          ));
+        await ze.setPreferences(z);
+        const qbR = await ze.getPreferences().catch(() => null),
+          qbBad = [],
+          qbN = (v) =>
+            typeof v == "string"
+              ? v.replace(/\\/g, "/").replace(/\/+$/, "")
+              : v;
+        qbR &&
+          Object.keys(z).forEach((k) => {
+            (!(k in qbR) || qbN(qbR[k]) !== qbN(z[k])) && qbBad.push(k);
+          });
+        z.torrent_content_layout &&
+          f((F) => ({
+            ...F,
+            torrent_content_layout: z.torrent_content_layout,
+            _csf0: F.create_subfolder_enabled,
+          }));
+        qbBad.length
+          ? nt.warning(
+              "Saved, but qBittorrent did not apply: " + qbBad.join(", "),
+            )
+          : nt.success(
+              `${A.charAt(0).toUpperCase() + A.slice(1)} settings saved`,
+            );
       } catch (z) {
         (console.error("Failed to save preferences:", z),
           nt.error("Failed to save settings"));
