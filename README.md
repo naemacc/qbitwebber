@@ -44,6 +44,18 @@ A modified fork of [ksuaning-au/qbitwebber](https://github.com/ksuaning-au/qbitw
   - Dates are compared by calendar day, so the second sort breaks ties between results from the same day (for example, Date then Seeds ranks same-day results by seeds).
   - Clicking a table column header also works: it becomes the primary sort and the previous primary becomes the secondary. Headers show a small `1` / `2` next to the arrow.
 - The expanded card on mobile also shows the full date and time, seed/leech ratio, exact size in bytes, link type and, for magnet links, the info hash and tracker count.
+- **Search filters** in the search box, applied to the results after they arrive:
+  - `site:examplesite` keeps only results from a matching site. Matching is loose: case, spaces and dashes are ignored, so `site:"example site"` and `site:example-site` also match a site named "Example Site".
+  - `-dogs` hides results that have `dogs` as a whole word in the title (so "Dogsled" is not hidden). Use quotes for a phrase, such as `-"hot dogs"`.
+  - `-site:examplesite` hides results from a matching site.
+  - Everything else is sent to qBittorrent as the actual search, so `site:examplesite cats -dogs` searches for `cats`. The filters don't make the search faster, since all plugins are still searched. The result count shows what is left after filtering.
+  - A query with only filters and no search term shows an error.
+- **Jackett/Prowlarr results show the real indexer** instead of the Jackett URL (for example `http://jackett:9117`). A result counts as Jackett/Prowlarr when its source contains `jackett` or `prowlarr`, or uses port `9117` or `9696`.
+  - The indexer name is taken from the `[Indexer]` that Jackett's search plugin appends to the title. If there is none, the host of the result's details link is used instead (for example `example.org`).
+  - That trailing `[Indexer]` is removed from the title, since it is now shown as the source.
+  - This relies on **tracker in title** being enabled in the Jackett search plugin's config. If it is off, a title that legitimately ends in a bracket (such as `[1080p]`) would be taken as the indexer name and hidden from the title.
+  - Results from other plugins are unchanged.
+  - The uploader is not shown, because Jackett's search plugin doesn't pass it to the web UI.
 - **No 60 second cutoff.** A search now keeps polling until qBittorrent reports it finished (with a 10 minute safety cap), so slow plugins are no longer dropped. Results still appear as they arrive, and the cancel button still works at any time.
 
 ### RSS

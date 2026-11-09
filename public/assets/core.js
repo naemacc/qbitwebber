@@ -27601,6 +27601,67 @@ function qbRow(l, v, brk) {
     ],
   });
 }
+function qbSource(k) {
+  const url = k.siteUrl || "";
+  if (!/jackett|prowlarr|:9117|:9696/i.test(url)) return url;
+  const m = /\[([^\[\]]{1,40})\]\s*$/.exec(k.fileName || "");
+  if (m) return m[1];
+  try {
+    return new URL(k.descrLink).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+function qbTitle(k) {
+  const name = k.fileName || "";
+  if (!/jackett|prowlarr|:9117|:9696/i.test(k.siteUrl || "")) return name;
+  return name.replace(/\s*\[[^\[\]]{1,40}\]\s*$/, "") || name;
+}
+function qbParseQuery(q) {
+  const out = { text: "", sites: [], notSites: [], excl: [] },
+    words = [],
+    re = /(-?)(site:)?(?:"([^"]*)"|(\S+))/gi;
+  let m;
+  while ((m = re.exec(q || ""))) {
+    const neg = m[1] === "-",
+      isSite = !!m[2],
+      val = (m[3] !== undefined ? m[3] : m[4] || "").trim();
+    if (!val) continue;
+    if (isSite) (neg ? out.notSites : out.sites).push(val);
+    else if (neg) out.excl.push(val);
+    else words.push(val);
+  }
+  out.text = words.join(" ");
+  return out;
+}
+function qbNorm(t) {
+  return String(t || "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+function qbFilterFn(f) {
+  if (!f || (!f.sites.length && !f.notSites.length && !f.excl.length))
+    return null;
+  const rx = f.excl.map((t) => {
+    const e = t
+      .trim()
+      .split(/\s+/)
+      .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("\\s+");
+    return new RegExp("(?<![\\p{L}\\p{N}])" + e + "(?![\\p{L}\\p{N}])", "iu");
+  });
+  const sites = f.sites.map(qbNorm).filter(Boolean),
+    notSites = f.notSites.map(qbNorm).filter(Boolean);
+  return (k) => {
+    const hay = qbNorm(
+      qbSource(k) + " " + (k.siteUrl || "") + " " + (k.descrLink || ""),
+    );
+    if (sites.length && !sites.some((x) => hay.includes(x))) return !1;
+    if (notSites.some((x) => hay.includes(x))) return !1;
+    const name = qbTitle(k);
+    return !rx.some((r) => r.test(name));
+  };
+}
 function qbExtraRows(k) {
   const m = qbMagnet(k.fileUrl),
     out = [];
@@ -27654,13 +27715,20 @@ function MA() {
     [O, j] = b.useState(!1),
     [A, z] = b.useState(null),
     [F, K] = b.useState(!1),
+    [qbFl, qbSetFl] = b.useState(null),
     V = b.useRef(!1),
     Y = b.useRef(null),
     q = async (k) => {
       if ((k.preventDefault(), !!n.trim())) {
+        const qbP = qbParseQuery(n);
+        if (!qbP.text) {
+          nt.error("Add a search term, not just filters");
+          return;
+        }
+        qbSetFl(qbP);
         (K(!1), (V.current = !1), f(!0), m(!0), i([]), C(1));
         try {
-          const { id: Z } = await ze.startSearch(n);
+          const { id: Z } = await ze.startSearch(qbP.text);
           if (((Y.current = Z), !Z)) {
             nt.error("Search not available - no plugins configured");
             return;
@@ -27705,7 +27773,7 @@ function MA() {
     },
     H = b.useMemo(
       () =>
-        [...s].sort((k, Z) => {
+        [...s].filter(qbFilterFn(qbFl) || (() => !0)).sort((k, Z) => {
           for (const S of y) {
             let $ = k[S.k],
               X = Z[S.k];
@@ -27726,7 +27794,7 @@ function MA() {
           }
           return 0;
         }),
-      [s, y],
+      [s, y, qbFl],
     ),
     qbPg = qbPaging() === "pages",
     le = Math.ceil(H.length / Os),
@@ -28025,7 +28093,7 @@ function MA() {
                                     d.jsx(_t, {
                                       className:
                                         "font-medium truncate max-w-[300px]",
-                                      children: k.fileName,
+                                      children: qbTitle(k),
                                     }),
                                     d.jsx(_t, { children: vo(k.fileSize) }),
                                     d.jsx(_t, {
@@ -28039,7 +28107,7 @@ function MA() {
                                     d.jsx(_t, {
                                       className:
                                         "text-muted-foreground truncate max-w-[150px]",
-                                      children: k.siteUrl,
+                                      children: qbSource(k),
                                     }),
                                     d.jsx(_t, {
                                       className: "text-sm",
@@ -28132,7 +28200,7 @@ function MA() {
                                     maxWidth: "100%",
                                     overflowWrap: "anywhere",
                                   },
-                                  children: k.fileName,
+                                  children: qbTitle(k),
                                 }),
                                 d.jsxs("div", {
                                   className:
@@ -28146,7 +28214,7 @@ function MA() {
                                     d.jsx("span", {
                                       className: "truncate qb-chip",
                                       style: { minWidth: 0 },
-                                      children: k.siteUrl,
+                                      children: qbSource(k),
                                     }),
                                     k.pubDate > 0 &&
                                       d.jsx("span", {
@@ -28206,7 +28274,7 @@ function MA() {
                                           d.jsx("span", {
                                             className: "truncate",
                                             style: { minWidth: 0 },
-                                            children: k.siteUrl,
+                                            children: qbSource(k),
                                           }),
                                         ],
                                       }),
@@ -28340,7 +28408,7 @@ function MA() {
                 children: [
                   d.jsx("p", {
                     className: "font-medium",
-                    children: E.fileName,
+                    children: qbTitle(E),
                   }),
                   d.jsxs("div", {
                     className: "text-sm text-muted-foreground mt-2 space-y-1",
@@ -28354,7 +28422,7 @@ function MA() {
                           E.nbLeechers,
                         ],
                       }),
-                      d.jsxs("p", { children: ["Source: ", E.siteUrl] }),
+                      d.jsxs("p", { children: ["Source: ", qbSource(E)] }),
                     ],
                   }),
                 ],
