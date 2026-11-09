@@ -25156,12 +25156,12 @@ function qbOpenFolder(t) {
     return;
   }
   try {
-    const a = document.createElement("a");
-    ((a.href = "qbitopen:" + encodeURIComponent(p)),
-      (a.style.display = "none"),
-      document.body.appendChild(a),
-      a.click(),
-      setTimeout(() => a.remove(), 1e3),
+    const f = document.createElement("iframe");
+    ((f.style.display = "none"),
+      f.setAttribute("aria-hidden", "true"),
+      (f.src = "qbitopen:" + encodeURIComponent(p)),
+      document.body.appendChild(f),
+      setTimeout(() => f.remove(), 3e3),
       nt.info("Opening in File Explorer..."));
   } catch {
     nt.error("Could not open File Explorer");
