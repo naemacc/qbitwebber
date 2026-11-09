@@ -3056,3 +3056,377 @@
     filter: blur(var(--tw-exit-blur, 0));
   }
 }
+
+/* mobile overflow safety net */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+#root,
+main {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* action buttons */
+.qb-act {
+  border: 1px solid rgba(128, 128, 128, 0.25);
+  background: rgba(128, 128, 128, 0.12);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.05s;
+}
+.qb-act:hover {
+  background: rgba(128, 128, 128, 0.28) !important;
+  border-color: rgba(128, 128, 128, 0.45);
+}
+.qb-act:active {
+  transform: scale(0.97);
+}
+.qb-act.qb-danger:hover {
+  background: rgba(239, 68, 68, 0.22) !important;
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
+}
+.qb-ib:hover,
+.qb-ib:focus-visible {
+  background: rgba(128, 128, 128, 0.22);
+}
+.qb-ib-danger:hover,
+.qb-ib-danger:focus-visible {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+/* consistent cursors: everything clickable gets a pointer, disabled gets not-allowed */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="checkbox"]:not([aria-disabled="true"]),
+[role="tab"],
+[role="menuitem"]:not([data-disabled]),
+[role="option"]:not([data-disabled]),
+[role="switch"],
+[role="combobox"],
+select,
+summary,
+label[for],
+a[href],
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"],
+input[type="file"]::file-selector-button {
+  cursor: pointer;
+}
+button:disabled,
+[aria-disabled="true"],
+[data-disabled] {
+  cursor: not-allowed;
+}
+
+/* one compact scale: form fields match the rest of the UI (14px, no 16px mobile bump) */
+.qb-ib {
+  text-decoration: none;
+}
+
+/* ---- interface size: scale the whole UI from the root so text, buttons, icons and spacing stay in proportion ---- */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+select,
+textarea {
+  font-size: 0.875rem !important;
+}
+
+/* ---- icon buttons with labels ---- */
+.qb-ib span {
+  overflow: hidden;
+  white-space: nowrap;
+}
+/* labels: hover = animated expand (default) | always = static with label | none = icons only */
+html[data-qb-labels="hover"] .qb-ib span {
+  max-width: 0;
+  opacity: 0;
+  margin-left: 0;
+  transition:
+    max-width 0.2s ease,
+    opacity 0.2s ease,
+    margin-left 0.2s ease;
+}
+html[data-qb-labels="hover"] .qb-ib:hover span,
+html[data-qb-labels="hover"] .qb-ib:focus-visible span {
+  max-width: 8rem;
+  opacity: 1;
+  margin-left: 0.4rem;
+}
+@media (hover: none) {
+  html[data-qb-labels="hover"] .qb-ib span {
+    max-width: 8rem;
+    opacity: 1;
+    margin-left: 0.4rem;
+  }
+}
+html[data-qb-labels="always"] .qb-ib span {
+  max-width: none;
+  opacity: 1;
+  margin-left: 0.4rem;
+  transition: none;
+}
+html[data-qb-labels="none"] .qb-ib span {
+  display: none;
+}
+
+/* ---- one coordinated type + control scale: Small / Normal (original look) / Large ---- */
+html {
+  --qb-title: 15px;
+  --qb-meta: 12px;
+  --qb-btn-h: 30px;
+  --qb-btn-fs: 14px;
+  --qb-ico: 16px;
+  --qb-act-h: 38px;
+  --qb-act-fs: 15px;
+}
+html[data-qb-size="small"] {
+  --qb-title: 13px;
+  --qb-meta: 11px;
+  --qb-btn-h: 26px;
+  --qb-btn-fs: 12px;
+  --qb-ico: 14px;
+  --qb-act-h: 34px;
+  --qb-act-fs: 13px;
+}
+html[data-qb-size="large"] {
+  --qb-title: 17px;
+  --qb-meta: 14px;
+  --qb-btn-h: 36px;
+  --qb-btn-fs: 16px;
+  --qb-ico: 19px;
+  --qb-act-h: 44px;
+  --qb-act-fs: 17px;
+}
+.text-\[10px\] {
+  font-size: var(--qb-meta);
+}
+.qb-title {
+  font-size: var(--qb-title);
+}
+.qb-ib {
+  display: inline-flex;
+  align-items: center;
+  height: var(--qb-btn-h);
+  padding: 0 0.45em;
+  border-radius: 0.4rem;
+  font-size: var(--qb-btn-fs);
+  line-height: 1;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.qb-ib svg {
+  width: var(--qb-ico);
+  height: var(--qb-ico);
+}
+.qb-act {
+  height: var(--qb-act-h) !important;
+  font-size: var(--qb-act-fs);
+}
+.qb-act svg {
+  width: var(--qb-ico);
+  height: var(--qb-ico);
+}
+
+/* ---- RSS ---- */
+/* mobile: read button spans the card */
+@media (max-width: 767px) {
+  .qb-rss-meta {
+    width: 100% !important;
+  }
+  .qb-rss-meta .qb-ib {
+    min-height: var(--qb-btn-h);
+  }
+}
+/* download strip: full-height right side of the article card, grows leftward with the label animation */
+.qb-strip {
+  background: rgba(128, 128, 128, 0.12);
+  transition: background 0.15s;
+}
+.qb-strip-btn {
+  color: inherit;
+}
+.qb-strip-btn:disabled {
+  opacity: 0.6;
+}
+@media (max-width: 767px) {
+  .qb-strip {
+    cursor: pointer;
+  }
+  .qb-strip:active {
+    background: rgba(128, 128, 128, 0.24);
+  }
+}
+/* feed list on mobile: one card at a time, horizontal snap */
+@media (max-width: 767px) {
+  .qb-feedbox {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .qb-feedbox::-webkit-scrollbar {
+    display: none;
+  }
+  .qb-feedlist {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+  .qb-feedlist > * {
+    flex: 0 0 100%;
+    min-width: 0;
+    margin: 0 !important;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
+}
+/* header wordmark: shown on the right on mobile only (desktop already shows it on the left) */
+@media (min-width: 640px) {
+  .qb-mlogo {
+    display: none;
+  }
+}
+
+/* =====================================================================
+   CARD THEME  (torrent / search / RSS cards share one anatomy)
+   - rounded cards, 2-line title, caps status row, pill info chips
+   - no side rail: the status text (and the RSS logo) carry the colour
+   - progress bar stays neutral
+   ===================================================================== */
+.qb-tcard,
+.qb-scard,
+.qb-rcard,
+.qb-fcard {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.1rem;
+  box-shadow: none;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+.qb-tcard:not(.border-primary),
+.qb-scard,
+.qb-rcard,
+.qb-fcard:not(.border-primary) {
+  border-color: rgba(128, 128, 128, 0.22);
+}
+
+.qb-tcard .qb-title,
+.qb-scard .qb-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: normal !important;
+  line-height: 1.3;
+}
+
+/* status row: caps locked */
+.qb-trow {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+/* search: seed availability colours the status text */
+.qb-scard[data-qb-health="good"] .qb-trow > span {
+  color: #22c55e;
+}
+.qb-scard[data-qb-health="ok"] .qb-trow > span {
+  color: #eab308;
+}
+.qb-scard[data-qb-health="low"] .qb-trow > span {
+  color: #ef4444;
+}
+/* rss: seed availability colours the logo */
+.qb-rcard[data-qb-health="good"] .qb-rlogo {
+  color: #22c55e;
+}
+.qb-rcard[data-qb-health="ok"] .qb-rlogo {
+  color: #eab308;
+}
+.qb-rcard[data-qb-health="low"] .qb-rlogo {
+  color: #ef4444;
+}
+
+/* info chips */
+.qb-meta {
+  gap: 0.35rem !important;
+  margin-top: 0.4rem !important;
+}
+.qb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.14);
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+.qb-chip.truncate {
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* thin neutral progress bar */
+.qb-tprog {
+  height: 4px !important;
+  margin-top: 0.65rem !important;
+  background: rgba(128, 128, 128, 0.2) !important;
+}
+.qb-tprog-fill {
+  border-radius: inherit;
+}
+
+/* quiet secondary actions (Mark all read, Mark as read, Copy all) */
+.qb-quiet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--qb-btn-h) !important;
+  padding: 0 0.7em !important;
+  border-radius: 0.5rem !important;
+  border: 1px solid rgba(128, 128, 128, 0.25) !important;
+  background: transparent !important;
+  color: var(--muted-foreground) !important;
+  font-size: calc(var(--qb-btn-fs) - 1px) !important;
+  font-weight: 500;
+  box-shadow: none !important;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.qb-quiet:hover {
+  background: rgba(128, 128, 128, 0.14) !important;
+  color: var(--foreground) !important;
+}
+.qb-quiet svg {
+  width: calc(var(--qb-ico) - 2px);
+  height: calc(var(--qb-ico) - 2px);
+}
+
+@media (hover: hover) {
+  .qb-tcard:hover,
+  .qb-scard:hover,
+  .qb-rcard:hover,
+  .qb-fcard:hover {
+    border-color: rgba(128, 128, 128, 0.5);
+  }
+}

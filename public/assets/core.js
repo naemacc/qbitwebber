@@ -13720,13 +13720,11 @@ var Q1 = class extends Rr {
       this.#t.setOptions(this.options),
       l._defaulted &&
         !wo(this.options, l) &&
-        this.#e
-          .getQueryCache()
-          .notify({
-            type: "observerOptionsUpdated",
-            query: this.#t,
-            observer: this,
-          }));
+        this.#e.getQueryCache().notify({
+          type: "observerOptionsUpdated",
+          query: this.#t,
+          observer: this,
+        }));
     const i = this.hasListeners();
     (i && $v(this.#t, s, this.options, l) && this.#d(),
       this.updateResult(),
@@ -14406,13 +14404,11 @@ var J1 = class extends Rr {
       const s = this.options;
       ((this.options = this.#e.defaultMutationOptions(l)),
         wo(this.options, s) ||
-          this.#e
-            .getMutationCache()
-            .notify({
-              type: "observerOptionsUpdated",
-              mutation: this.#n,
-              observer: this,
-            }),
+          this.#e.getMutationCache().notify({
+            type: "observerOptionsUpdated",
+            mutation: this.#n,
+            observer: this,
+          }),
         s?.mutationKey &&
         this.options.mutationKey &&
         _l(s.mutationKey) !== _l(this.options.mutationKey)
@@ -16186,8 +16182,23 @@ class Yw {
   async addRSSFeed(l, s) {
     const i = new URLSearchParams();
     (i.append("url", l),
-      s && i.append("path", s),
+      i.append("path", s || l),
       await this.request("/api/v2/rss/addFeed", { method: "POST", body: i }));
+  }
+  async moveRSSItem(l, s) {
+    const i = new URLSearchParams();
+    (i.append("itemPath", l),
+      i.append("destPath", s),
+      await this.request("/api/v2/rss/moveItem", { method: "POST", body: i }));
+  }
+  async setRSSFeedURL(l, s) {
+    const i = new URLSearchParams();
+    (i.append("path", l),
+      i.append("url", s),
+      await this.request("/api/v2/rss/setFeedURL", {
+        method: "POST",
+        body: i,
+      }));
   }
   async removeRSSItem(l) {
     const s = new URLSearchParams();
@@ -17648,7 +17659,7 @@ var F2 = function () {
             .join(""),
           `
   }
-  
+
   .`,
         )
         .concat(
@@ -17661,7 +17672,7 @@ var F2 = function () {
           i,
           `;
   }
-  
+
   .`,
         )
         .concat(
@@ -17674,7 +17685,7 @@ var F2 = function () {
           i,
           `;
   }
-  
+
   .`,
         )
         .concat(bo, " .")
@@ -17687,7 +17698,7 @@ var F2 = function () {
           i,
           `;
   }
-  
+
   .`,
         )
         .concat(xo, " .")
@@ -17700,7 +17711,7 @@ var F2 = function () {
           i,
           `;
   }
-  
+
   body[`,
         )
         .concat(
@@ -24235,13 +24246,32 @@ function fA() {
     },
   });
 }
+function qbNames(qc, hashes) {
+  const one = hashes.length === 1;
+  try {
+    const m = new Map();
+    for (const [, data] of qc.getQueriesData({ queryKey: ["torrents"] }))
+      if (Array.isArray(data))
+        for (const t of data) t && t.hash && m.set(t.hash, t.name);
+    if (one) {
+      const nm = m.get(hashes[0]);
+      return nm ? (nm.length > 60 ? nm.slice(0, 57) + "..." : nm) : "Torrent";
+    }
+  } catch {}
+  return one ? "Torrent" : hashes.length + " torrents";
+}
 function hA() {
   const n = ha();
   return Nl({
     mutationFn: ({ hashes: l, deleteFiles: s }) => ze.deleteTorrents(l, s),
-    onSuccess: () => {
-      n.invalidateQueries({ queryKey: ["torrents"] });
+    onSuccess: (r, v) => {
+      const nm = qbNames(n, v.hashes);
+      (n.invalidateQueries({ queryKey: ["torrents"] }),
+        nt.success(
+          v.deleteFiles ? nm + " deleted with files" : nm + " deleted",
+        ));
     },
+    onError: () => nt.error("Failed to delete torrent"),
   });
 }
 function mA() {
@@ -24258,18 +24288,22 @@ function pA() {
   const n = ha();
   return Nl({
     mutationFn: (l) => ze.pauseTorrents(l),
-    onSuccess: () => {
-      n.invalidateQueries({ queryKey: ["torrents"] });
+    onSuccess: (r, v) => {
+      (nt.success(qbNames(n, v) + " paused"),
+        n.invalidateQueries({ queryKey: ["torrents"] }));
     },
+    onError: () => nt.error("Failed to pause torrent"),
   });
 }
 function vA() {
   const n = ha();
   return Nl({
     mutationFn: (l) => ze.resumeTorrents(l),
-    onSuccess: () => {
-      n.invalidateQueries({ queryKey: ["torrents"] });
+    onSuccess: (r, v) => {
+      (nt.success(qbNames(n, v) + " resumed"),
+        n.invalidateQueries({ queryKey: ["torrents"] }));
     },
+    onError: () => nt.error("Failed to resume torrent"),
   });
 }
 function gA() {
@@ -24300,6 +24334,18 @@ function xA() {
   const n = ha();
   return Nl({
     mutationFn: (l) => ze.removeRSSItem(l),
+    onSuccess: () => {
+      n.invalidateQueries({ queryKey: ["rss"] });
+    },
+  });
+}
+function rssEditHook() {
+  const n = ha();
+  return Nl({
+    mutationFn: async ({ path: l, url: s, oldUrl: i, newPath: c }) => {
+      (s !== i && (await ze.setRSSFeedURL(l, s)),
+        c !== l && (await ze.moveRSSItem(l, c)));
+    },
     onSuccess: () => {
       n.invalidateQueries({ queryKey: ["rss"] });
     },
@@ -24430,6 +24476,11 @@ function wA({ activeTab: n, onTabChange: l, children: s }) {
                     }),
                   ],
                 }),
+              d.jsx("span", {
+                className: "text-lg font-semibold qb-mlogo",
+                style: { fontFamily: "Silkscreen", fontSize: 20 },
+                children: "qBittorrent",
+              }),
             ],
           }),
           i &&
@@ -24474,7 +24525,11 @@ function wA({ activeTab: n, onTabChange: l, children: s }) {
               ),
             ),
           }),
-          d.jsx("main", { className: "flex-1 p-4 pb-16 md:pb-4", children: s }),
+          d.jsx("main", {
+            className: "flex-1 p-4 pb-16 md:pb-4",
+            style: { minWidth: 0, maxWidth: "100%" },
+            children: s,
+          }),
         ],
       }),
       d.jsx("nav", {
@@ -24482,28 +24537,26 @@ function wA({ activeTab: n, onTabChange: l, children: s }) {
           "md:hidden fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur",
         children: d.jsx("div", {
           className: "flex justify-around py-2",
-          children: m
-            .slice(0, 5)
-            .map((y) =>
-              d.jsxs(
-                "button",
-                {
-                  className: Be(
-                    "flex flex-col items-center gap-1 px-3 py-1 rounded-md",
-                    n === y.id ? "text-primary" : "text-muted-foreground",
-                  ),
-                  onClick: () => l(y.id),
-                  children: [
-                    y.icon,
-                    d.jsx("span", {
-                      className: "text-[10px]",
-                      children: y.label,
-                    }),
-                  ],
-                },
-                y.id,
-              ),
+          children: m.slice(0, 5).map((y) =>
+            d.jsxs(
+              "button",
+              {
+                className: Be(
+                  "flex flex-col items-center gap-1 px-3 py-1 rounded-md",
+                  n === y.id ? "text-primary" : "text-muted-foreground",
+                ),
+                onClick: () => l(y.id),
+                children: [
+                  y.icon,
+                  d.jsx("span", {
+                    className: "text-[10px]",
+                    children: y.label,
+                  }),
+                ],
+              },
+              y.id,
             ),
+          ),
         }),
       }),
     ],
@@ -24798,15 +24851,86 @@ function _A({ files: n, hash: l, onPriorityChange: s }) {
 function jA({ torrent: n, open: l, onOpenChange: s }) {
   const { data: i, isLoading: c } = dA(n?.hash ?? null),
     f = mA(),
+    qc = ha(),
     [h, m] = b.useState(null),
+    [qbOptS, qbSetOptS] = b.useState({ seq: !1, flp: !1, tmm: !1 }),
+    [qbBusy, qbSetBusy] = b.useState(!1),
+    qbLoad = async () => {
+      if (!n) return;
+      try {
+        const r = await ze.request("/api/v2/torrents/info?hashes=" + n.hash),
+          t = Array.isArray(r) ? r[0] : null;
+        t &&
+          qbSetOptS({
+            seq: !!t.seq_dl,
+            flp: !!t.f_l_piece_prio,
+            tmm: !!t.auto_tmm,
+          });
+      } catch {}
+    },
+    qbPost = async (path, params) => {
+      const p = new URLSearchParams();
+      p.append("hashes", n.hash);
+      for (const k in params) p.append(k, params[k]);
+      return ze.request(path, { method: "POST", body: p });
+    },
+    qbToggle = async (key, want) => {
+      if (qbOptS[key] === want) return;
+      qbSetBusy(!0);
+      try {
+        if (key === "tmm")
+          await qbPost("/api/v2/torrents/setAutoManagement", {
+            enable: String(want),
+          });
+        else
+          await qbPost(
+            key === "seq"
+              ? "/api/v2/torrents/toggleSequentialDownload"
+              : "/api/v2/torrents/toggleFirstLastPiecePrio",
+            {},
+          );
+        await qbLoad();
+        qc.invalidateQueries({ queryKey: ["torrents"] });
+        nt.success(
+          {
+            seq: "Sequential download",
+            flp: "First/last piece priority",
+            tmm: "Automatic management",
+          }[key] + (want ? " enabled" : " disabled"),
+        );
+      } catch {
+        nt.error("Failed to change option");
+      } finally {
+        qbSetBusy(!1);
+      }
+    },
+    qbAll = async (on) => {
+      if (!n || !i || !i.length) return;
+      try {
+        const ids = i.map((w, k) =>
+          typeof w.index === "number" ? w.index : k,
+        );
+        await ze.setFilePriority(n.hash, ids.join("|"), on ? 1 : 0);
+        qc.invalidateQueries({ queryKey: ["torrent", n.hash, "files"] });
+        nt.success(on ? "All files selected" : "All files deselected");
+      } catch {
+        nt.error("Failed to update file priority");
+      }
+    },
     y = async (w, C) => {
       if (n)
         try {
           await f.mutateAsync({ hash: n.hash, id: w, priority: C });
+          nt.success(C > 0 ? "File selected" : "File deselected", {
+            id: "qb-prio",
+          });
         } catch {
           nt.error("Failed to update file priority");
         }
     };
+  b.useEffect(() => {
+    l && n && qbLoad();
+  }, [n?.hash, l]);
   if (!n) return null;
   const p = i?.filter((w) => w.priority > 0).length || 0,
     x = i?.reduce((w, C) => w + C.size, 0) || 0,
@@ -24830,6 +24954,66 @@ function jA({ torrent: n, open: l, onOpenChange: s }) {
             }),
           ],
         }),
+        qbE(
+          "div",
+          {
+            className: "border-b",
+            style: {
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+              padding: "16px",
+              flexShrink: 0,
+            },
+          },
+          qbE(
+            "div",
+            {
+              style: { display: "flex", flexDirection: "column", gap: "14px" },
+            },
+            qbCheck(
+              "qbo-seq",
+              "Download in sequential order",
+              qbOptS.seq,
+              (v) => qbToggle("seq", v),
+            ),
+            qbCheck(
+              "qbo-flp",
+              "Download first and last pieces first",
+              qbOptS.flp,
+              (v) => qbToggle("flp", v),
+            ),
+            qbCheck(
+              "qbo-tmm",
+              "Automatic torrent management",
+              qbOptS.tmm,
+              (v) => qbToggle("tmm", v),
+            ),
+          ),
+          qbE(
+            "div",
+            {
+              style: {
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "8px",
+                paddingTop: "4px",
+              },
+            },
+            d.jsx(Se, {
+              variant: "outline",
+              size: "sm",
+              onClick: () => qbAll(!0),
+              children: "Select all",
+            }),
+            d.jsx(Se, {
+              variant: "outline",
+              size: "sm",
+              onClick: () => qbAll(!1),
+              children: "Deselect all",
+            }),
+          ),
+        ),
         d.jsx("div", {
           className: "flex-1 overflow-y-auto",
           children: c
@@ -24972,11 +25156,12 @@ function qbOpenFolder(t) {
     return;
   }
   try {
-    const f = document.createElement("iframe");
-    ((f.style.display = "none"),
-      (f.src = "qbitopen:" + encodeURIComponent(p)),
-      document.body.appendChild(f),
-      setTimeout(() => f.remove(), 3e3),
+    const a = document.createElement("a");
+    ((a.href = "qbitopen:" + encodeURIComponent(p)),
+      (a.style.display = "none"),
+      document.body.appendChild(a),
+      a.click(),
+      setTimeout(() => a.remove(), 1e3),
       nt.info("Opening in File Explorer..."));
   } catch {
     nt.error("Could not open File Explorer");
@@ -24994,6 +25179,7 @@ function NA() {
     [C, E] = b.useState(null),
     [_, O] = b.useState(null),
     [qbDel, qbSetDel] = b.useState(null),
+    qbQc = ha(),
     qbAsk = (hashes, label, files, bulk) =>
       qbSetDel({ hashes, label, files: !!files, bulk: !!bulk }),
     j = b.useMemo(
@@ -25035,8 +25221,10 @@ function NA() {
           : [],
       [n, m, p],
     ),
+    qbPg = qbPaging() === "pages",
     A = Math.ceil(j.length / kd),
-    z = j.slice((g - 1) * kd, g * kd),
+    z = qbPg ? j.slice((g - 1) * kd, g * kd) : j.slice(0, g * kd * 2),
+    qbTMore = b.useRef(null),
     F = (H, le) => {
       h((re) => {
         const ie = new Set(re);
@@ -25067,8 +25255,19 @@ function NA() {
       );
     };
   b.useEffect(() => {
-    A > 0 && g > A && w(A);
-  }, [A, g]);
+    if (qbPg) {
+      A > 0 && g > A && w(A);
+      return;
+    }
+    const el = qbTMore.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (es) => es.some((e) => e.isIntersecting) && w((k) => k + 1),
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [z.length, j.length, g, A, qbPg]);
   return l
     ? d.jsx("div", {
         className: "text-center py-8 text-muted-foreground",
@@ -25084,47 +25283,79 @@ function NA() {
           children: [
             f.size > 0 &&
               d.jsxs("div", {
-                className:
-                  "flex items-center gap-2 p-2 bg-muted rounded-lg overflow-x-auto",
+                style: { display: "flex", flexDirection: "column", gap: "8px" },
                 children: [
-                  d.jsxs("span", {
-                    className: "text-sm whitespace-nowrap",
-                    children: [f.size, " selected"],
-                  }),
-                  d.jsxs(Se, {
-                    variant: "ghost",
-                    size: "sm",
-                    onClick: q,
+                  d.jsxs("div", {
+                    className: "text-sm text-muted-foreground",
+                    style: {
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "0 2px",
+                    },
                     children: [
-                      d.jsx(zd, { className: "h-4 w-4 mr-1" }),
-                      " Resume",
+                      d.jsxs("span", { children: [f.size, " selected"] }),
+                      d.jsx("button", {
+                        type: "button",
+                        className: "qb-ib",
+                        onClick: () => h(new Set()),
+                        children: "Clear",
+                      }),
                     ],
                   }),
-                  d.jsxs(Se, {
-                    variant: "ghost",
-                    size: "sm",
-                    onClick: Y,
+                  d.jsxs("div", {
+                    className: "p-2 bg-muted rounded-lg",
+                    style: {
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(130px, 1fr))",
+                      gap: "8px",
+                    },
                     children: [
-                      d.jsx(Dd, { className: "h-4 w-4 mr-1" }),
-                      " Pause",
-                    ],
-                  }),
-                  d.jsxs(Se, {
-                    variant: "ghost",
-                    size: "sm",
-                    onClick: () => te(!1),
-                    children: [
-                      d.jsx(zs, { className: "h-4 w-4 mr-1" }),
-                      " Delete",
-                    ],
-                  }),
-                  d.jsxs(Se, {
-                    variant: "ghost",
-                    size: "sm",
-                    onClick: () => te(!0),
-                    children: [
-                      d.jsx(zs, { className: "h-4 w-4 mr-1" }),
-                      " Delete + Files",
+                      d.jsxs(Se, {
+                        variant: "ghost",
+                        size: "sm",
+                        className: "qb-act",
+                        style: { justifyContent: "center" },
+                        onClick: q,
+                        children: [
+                          d.jsx(zd, { className: "h-4 w-4 mr-1" }),
+                          " Resume",
+                        ],
+                      }),
+                      d.jsxs(Se, {
+                        variant: "ghost",
+                        size: "sm",
+                        className: "qb-act",
+                        style: { justifyContent: "center" },
+                        onClick: Y,
+                        children: [
+                          d.jsx(Dd, { className: "h-4 w-4 mr-1" }),
+                          " Pause",
+                        ],
+                      }),
+                      d.jsxs(Se, {
+                        variant: "ghost",
+                        size: "sm",
+                        className: "qb-act",
+                        style: { justifyContent: "center" },
+                        onClick: () => qbRecheckHashes(qbQc, Array.from(f)),
+                        children: [
+                          d.jsx(RssRefreshIcon, { className: "h-4 w-4 mr-1" }),
+                          " Force recheck",
+                        ],
+                      }),
+                      d.jsxs(Se, {
+                        variant: "ghost",
+                        size: "sm",
+                        className: "qb-act qb-danger",
+                        style: { justifyContent: "center" },
+                        onClick: () => te(!1),
+                        children: [
+                          d.jsx(zs, { className: "h-4 w-4 mr-1" }),
+                          " Delete",
+                        ],
+                      }),
                     ],
                   }),
                 ],
@@ -25136,91 +25367,100 @@ function NA() {
                   className: "text-sm text-muted-foreground",
                   children: [j.length, " torrents"],
                 }),
-                d.jsxs(Wd, {
-                  children: [
-                    d.jsx(ef, {
-                      asChild: !0,
-                      children: d.jsxs(Se, {
-                        variant: "outline",
-                        size: "sm",
+                qbSortWrap(
+                  p,
+                  () => (x(p === "asc" ? "desc" : "asc"), w(1)),
+                  d.jsxs(Wd, {
+                    children: [
+                      d.jsx(ef, {
+                        asChild: !0,
+                        children: d.jsx(Se, {
+                          variant: "outline",
+                          size: "sm",
+                          style: QB_SORT_VAL,
+                          children: TA[m],
+                        }),
+                      }),
+                      d.jsxs(tf, {
+                        align: "end",
                         children: [
-                          d.jsx(zo, { className: "h-4 w-4 mr-2" }),
-                          "Sort: ",
-                          TA[m],
-                          p === "asc" ? " ↑" : " ↓",
+                          d.jsxs(zt, {
+                            onClick: () => m !== "name" && V("name"),
+                            children: [
+                              "Name ",
+                              m === "name" &&
+                                d.jsx(QbSortIcon, { dir: p, mr: 0, ml: 8 }),
+                            ],
+                          }),
+                          d.jsxs(zt, {
+                            onClick: () => m !== "state" && V("state"),
+                            children: [
+                              "Status ",
+                              m === "state" &&
+                                d.jsx(QbSortIcon, { dir: p, mr: 0, ml: 8 }),
+                            ],
+                          }),
+                          d.jsxs(zt, {
+                            onClick: () => m !== "progress" && V("progress"),
+                            children: [
+                              "Progress ",
+                              m === "progress" &&
+                                d.jsx(QbSortIcon, { dir: p, mr: 0, ml: 8 }),
+                            ],
+                          }),
+                          d.jsxs(zt, {
+                            onClick: () => m !== "size" && V("size"),
+                            children: [
+                              "Size ",
+                              m === "size" &&
+                                d.jsx(QbSortIcon, { dir: p, mr: 0, ml: 8 }),
+                            ],
+                          }),
+                          d.jsxs(zt, {
+                            onClick: () => m !== "dlspeed" && V("dlspeed"),
+                            children: [
+                              "Download ",
+                              m === "dlspeed" &&
+                                d.jsx(QbSortIcon, { dir: p, mr: 0, ml: 8 }),
+                            ],
+                          }),
+                          d.jsxs(zt, {
+                            onClick: () => m !== "upspeed" && V("upspeed"),
+                            children: [
+                              "Upload ",
+                              m === "upspeed" &&
+                                d.jsx(QbSortIcon, { dir: p, mr: 0, ml: 8 }),
+                            ],
+                          }),
+                          d.jsxs(zt, {
+                            onClick: () => m !== "eta" && V("eta"),
+                            children: [
+                              "ETA ",
+                              m === "eta" &&
+                                d.jsx(QbSortIcon, { dir: p, mr: 0, ml: 8 }),
+                            ],
+                          }),
+                          d.jsxs(zt, {
+                            onClick: () => m !== "ratio" && V("ratio"),
+                            children: [
+                              "Ratio ",
+                              m === "ratio" &&
+                                d.jsx(QbSortIcon, { dir: p, mr: 0, ml: 8 }),
+                            ],
+                          }),
+                          d.jsxs(zt, {
+                            onClick: () => m !== "added_on" && V("added_on"),
+                            children: [
+                              "Date added ",
+                              m === "added_on" &&
+                                d.jsx(QbSortIcon, { dir: p, mr: 0, ml: 8 }),
+                            ],
+                          }),
                         ],
                       }),
-                    }),
-                    d.jsxs(tf, {
-                      align: "end",
-                      children: [
-                        d.jsxs(zt, {
-                          onClick: () => V("name"),
-                          children: [
-                            "Name ",
-                            m === "name" && (p === "asc" ? "↑" : "↓"),
-                          ],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => V("state"),
-                          children: [
-                            "Status ",
-                            m === "state" && (p === "asc" ? "↑" : "↓"),
-                          ],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => V("progress"),
-                          children: [
-                            "Progress ",
-                            m === "progress" && (p === "asc" ? "↑" : "↓"),
-                          ],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => V("size"),
-                          children: [
-                            "Size ",
-                            m === "size" && (p === "asc" ? "↑" : "↓"),
-                          ],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => V("dlspeed"),
-                          children: [
-                            "Download ",
-                            m === "dlspeed" && (p === "asc" ? "↑" : "↓"),
-                          ],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => V("upspeed"),
-                          children: [
-                            "Upload ",
-                            m === "upspeed" && (p === "asc" ? "↑" : "↓"),
-                          ],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => V("eta"),
-                          children: [
-                            "ETA ",
-                            m === "eta" && (p === "asc" ? "↑" : "↓"),
-                          ],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => V("ratio"),
-                          children: [
-                            "Ratio ",
-                            m === "ratio" && (p === "asc" ? "↑" : "↓"),
-                          ],
-                        }),
-                        d.jsxs(zt, {
-                          onClick: () => V("added_on"),
-                          children: [
-                            "Date added ",
-                            m === "added_on" && (p === "asc" ? "↑" : "↓"),
-                          ],
-                        }),
-                      ],
-                    }),
-                  ],
-                }),
+                    ],
+                  }),
+                ),
               ],
             }),
             d.jsx("div", {
@@ -25449,6 +25689,17 @@ function NA() {
                                           variant: "ghost",
                                           size: "icon",
                                           className: "h-8 w-8",
+                                          title: "Force recheck",
+                                          onClick: () =>
+                                            qbRecheckHashes(qbQc, [H.hash]),
+                                          children: d.jsx(RssRefreshIcon, {
+                                            className: "h-4 w-4",
+                                          }),
+                                        }),
+                                        d.jsx(Se, {
+                                          variant: "ghost",
+                                          size: "icon",
+                                          className: "h-8 w-8",
                                           onClick: () => E(H),
                                           children: d.jsx(Hg, {
                                             className: "h-4 w-4 mr-2",
@@ -25464,36 +25715,16 @@ function NA() {
                                             className: "h-4 w-4",
                                           }),
                                         }),
-                                        d.jsxs(Wd, {
-                                          children: [
-                                            d.jsx(ef, {
-                                              asChild: !0,
-                                              children: d.jsx(Se, {
-                                                variant: "ghost",
-                                                size: "icon",
-                                                className: "h-8 w-8",
-                                                children: d.jsx(zs, {
-                                                  className: "h-4 w-4",
-                                                }),
-                                              }),
-                                            }),
-                                            d.jsxs(tf, {
-                                              align: "end",
-                                              children: [
-                                                d.jsx(zt, {
-                                                  onClick: () =>
-                                                    qbAsk([H.hash], H.name, !1),
-                                                  children: "Delete",
-                                                }),
-                                                d.jsx(zt, {
-                                                  onClick: () =>
-                                                    qbAsk([H.hash], H.name, !0),
-                                                  className: "text-destructive",
-                                                  children: "Delete + Files",
-                                                }),
-                                              ],
-                                            }),
-                                          ],
+                                        d.jsx(Se, {
+                                          variant: "ghost",
+                                          size: "icon",
+                                          className: "h-8 w-8",
+                                          title: "Delete",
+                                          onClick: () =>
+                                            qbAsk([H.hash], H.name, !1),
+                                          children: d.jsx(zs, {
+                                            className: "h-4 w-4",
+                                          }),
                                         }),
                                       ],
                                     }),
@@ -25519,7 +25750,9 @@ function NA() {
                   jt,
                   {
                     className:
-                      (f.has(H.hash) ? "border-primary" : "") + " py-3",
+                      (f.has(H.hash) ? "border-primary" : "") +
+                      " py-3 qb-tcard",
+                    "data-qb-st": qbStKind(H.state),
                     children: d.jsxs(Tt, {
                       className: "px-3",
                       children: [
@@ -25537,7 +25770,7 @@ function NA() {
                               children: [
                                 d.jsxs("div", {
                                   className:
-                                    "flex items-center justify-between text-[10px]",
+                                    "flex items-center justify-between text-[10px] qb-trow",
                                   children: [
                                     d.jsx("span", {
                                       className: `${Gg(H.state, H.completion_on)} flex-shrink-0`,
@@ -25554,21 +25787,22 @@ function NA() {
                                   ],
                                 }),
                                 d.jsx("p", {
-                                  className:
-                                    "font-medium text-xs truncate max-w-[180px]",
+                                  className: "font-medium qb-title truncate",
+                                  style: { maxWidth: "100%" },
                                   children: H.name,
                                 }),
                                 d.jsxs("div", {
                                   className:
-                                    "flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5",
+                                    "flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5 qb-meta",
+                                  style: { flexWrap: "wrap" },
                                   children: [
                                     d.jsx("span", {
-                                      className: "flex-shrink-0",
+                                      className: "flex-shrink-0 qb-chip",
                                       children: Er(H.size),
                                     }),
                                     d.jsxs("span", {
                                       className:
-                                        "flex items-center gap-0.5 flex-shrink-0",
+                                        "flex items-center gap-0.5 flex-shrink-0 qb-chip",
                                       children: [
                                         d.jsx(Tr, {
                                           className:
@@ -25579,7 +25813,7 @@ function NA() {
                                     }),
                                     d.jsxs("span", {
                                       className:
-                                        "flex items-center gap-0.5 flex-shrink-0",
+                                        "flex items-center gap-0.5 flex-shrink-0 qb-chip",
                                       children: [
                                         d.jsx(Jd, {
                                           className:
@@ -25588,6 +25822,12 @@ function NA() {
                                         Er(H.upspeed),
                                       ],
                                     }),
+                                    H.progress < 1 &&
+                                      d.jsxs("span", {
+                                        className: "flex-shrink-0 qb-chip",
+                                        title: "Time remaining",
+                                        children: ["ETA ", qg(H.eta)],
+                                      }),
                                   ],
                                 }),
                                 re &&
@@ -25595,18 +25835,6 @@ function NA() {
                                     className:
                                       "mt-1 pt-1 border-t space-y-1 text-[10px]",
                                     children: [
-                                      d.jsxs("div", {
-                                        className: "flex justify-between",
-                                        children: [
-                                          d.jsx("span", {
-                                            className: "text-muted-foreground",
-                                            children: "ETA:",
-                                          }),
-                                          d.jsx("span", {
-                                            children: qg(H.eta),
-                                          }),
-                                        ],
-                                      }),
                                       d.jsxs("div", {
                                         className: "flex justify-between",
                                         children: [
@@ -25672,47 +25900,79 @@ function NA() {
                         }),
                         d.jsx("div", {
                           className:
-                            "mt-1 h-1 bg-secondary rounded-full overflow-hidden",
+                            "mt-1 h-1 bg-secondary rounded-full overflow-hidden qb-tprog",
                           children: d.jsx("div", {
-                            className: "h-full bg-primary transition-all",
+                            className:
+                              "h-full bg-primary transition-all qb-tprog-fill",
                             style: { width: `${H.progress * 100}%` },
                           }),
                         }),
                         d.jsxs("div", {
                           className: "flex items-center gap-1 mt-1",
+                          style: { flexWrap: "wrap" },
                           children: [
-                            d.jsx(Se, {
-                              variant: "ghost",
-                              size: "icon",
-                              className: "h-7 w-7",
-                              onClick: () =>
-                                le ? s.mutate([H.hash]) : i.mutate([H.hash]),
-                              children: le
-                                ? d.jsx(Dd, { className: "h-3 w-3" })
-                                : d.jsx(zd, { className: "h-3 w-3" }),
-                            }),
-                            d.jsx(Se, {
-                              variant: "ghost",
-                              size: "icon",
-                              className: "h-7 w-7",
-                              onClick: () => E(H),
-                              children: d.jsx(Hg, { className: "h-3 w-3" }),
-                            }),
-                            d.jsx(Se, {
-                              variant: "ghost",
-                              size: "icon",
-                              className: "h-7 w-7",
-                              title: "Open folder in File Explorer",
-                              onClick: () => qbOpenFolder(H),
-                              children: d.jsx(DN, { className: "h-3 w-3" }),
-                            }),
-                            d.jsx(Se, {
-                              variant: "ghost",
-                              size: "icon",
-                              className: "h-7 w-7",
-                              onClick: () => qbAsk([H.hash], H.name, !1),
-                              children: d.jsx(zs, { className: "h-3 w-3" }),
-                            }),
+                            qbE(
+                              "button",
+                              {
+                                type: "button",
+                                className: "qb-ib",
+                                title: le ? "Pause" : "Resume",
+                                onClick: () =>
+                                  le ? s.mutate([H.hash]) : i.mutate([H.hash]),
+                              },
+                              le
+                                ? d.jsx(Dd, { className: "h-3.5 w-3.5" })
+                                : d.jsx(zd, { className: "h-3.5 w-3.5" }),
+                              d.jsx("span", {
+                                children: le ? "Pause" : "Resume",
+                              }),
+                            ),
+                            qbE(
+                              "button",
+                              {
+                                type: "button",
+                                className: "qb-ib",
+                                title: "Force recheck",
+                                onClick: () => qbRecheckHashes(qbQc, [H.hash]),
+                              },
+                              d.jsx(RssRefreshIcon, {
+                                className: "h-3.5 w-3.5",
+                              }),
+                              d.jsx("span", { children: "Force recheck" }),
+                            ),
+                            qbE(
+                              "button",
+                              {
+                                type: "button",
+                                className: "qb-ib",
+                                title: "Files",
+                                onClick: () => E(H),
+                              },
+                              d.jsx(Hg, { className: "h-3.5 w-3.5" }),
+                              d.jsx("span", { children: "Files" }),
+                            ),
+                            qbE(
+                              "button",
+                              {
+                                type: "button",
+                                className: "qb-ib",
+                                title: "Open folder",
+                                onClick: () => qbOpenFolder(H),
+                              },
+                              d.jsx(DN, { className: "h-3.5 w-3.5" }),
+                              d.jsx("span", { children: "Open folder" }),
+                            ),
+                            qbE(
+                              "button",
+                              {
+                                type: "button",
+                                className: "qb-ib qb-ib-danger",
+                                title: "Delete",
+                                onClick: () => qbAsk([H.hash], H.name, !1),
+                              },
+                              d.jsx(zs, { className: "h-3.5 w-3.5" }),
+                              d.jsx("span", { children: "Delete" }),
+                            ),
                           ],
                         }),
                       ],
@@ -25722,7 +25982,15 @@ function NA() {
                 );
               }),
             }),
-            A > 1 &&
+            !qbPg &&
+              z.length < j.length &&
+              d.jsx("div", {
+                ref: qbTMore,
+                className: "py-4 text-center text-sm text-muted-foreground",
+                children: "Loading more (" + z.length + " of " + j.length + ")",
+              }),
+            qbPg &&
+              A > 1 &&
               d.jsxs("div", {
                 className: "flex items-center justify-between px-2",
                 children: [
@@ -25786,14 +26054,15 @@ function NA() {
                       }),
                       d.jsx(Le, {
                         htmlFor: "qb-del-files",
-                        children: "Also delete downloaded files",
+                        children: "Delete files",
                       }),
                     ],
                   }),
                   qbDel?.files &&
                     d.jsx("p", {
                       className: "text-sm text-destructive",
-                      children: "The files will be permanently deleted from disk.",
+                      children:
+                        "The files will be permanently deleted from disk.",
                     }),
                   d.jsxs(J0, {
                     children: [
@@ -25812,7 +26081,7 @@ function NA() {
                             qbDel.bulk && h(new Set()),
                             qbSetDel(null));
                         },
-                        children: qbDel?.files ? "Delete + Files" : "Delete",
+                        children: "Delete",
                       }),
                     ],
                   }),
@@ -25822,190 +26091,646 @@ function NA() {
           ],
         });
 }
-function AA() {
-  const [n, l] = b.useState("url"),
-    [s, i] = b.useState(""),
-    [c, f] = b.useState(""),
-    [h, m] = b.useState(""),
-    y = b.useRef(null),
-    p = fA(),
-    x = async (w) => {
-      if ((w.preventDefault(), !!s))
-        try {
-          (await p.mutateAsync({ url: s, category: c, savePath: h }),
-            nt.success("Torrent added successfully"),
-            i(""));
-        } catch {
-          nt.error("Failed to add torrent");
-        }
-    },
-    g = async (w) => {
-      w.preventDefault();
-      const C = y.current?.files?.[0];
-      if (C)
-        try {
-          (await p.mutateAsync({ file: C, category: c, savePath: h }),
-            nt.success("Torrent added successfully"),
-            y.current && (y.current.value = ""));
-        } catch {
-          nt.error("Failed to add torrent");
-        }
+const qbE = (t, p, ...c) => d.jsxs(t, { ...p, children: c });
+function qbStKind(s) {
+  s = String(s || "");
+  if (s === "error" || s === "missingFiles") return "err";
+  if (s.startsWith("paused") || s.startsWith("stopped")) return "paused";
+  if (s.startsWith("checking") || s === "allocating" || s === "moving")
+    return "chk";
+  if (/DL$/.test(s) || s === "downloading") return "dl";
+  if (
+    /UP$/.test(s) ||
+    s === "uploading" ||
+    s === "seeding" ||
+    s === "completed"
+  )
+    return "up";
+  return "idle";
+}
+function rssNum(v) {
+  if (v === void 0 || v === null || v === "") return null;
+  const n = Number(String(v).replace(/,/g, ""));
+  return isFinite(n) && n >= 0 ? n : null;
+}
+function rssBytes(t) {
+  const m = /(\d+(?:[.,]\d+)?)\s*(B|[KMGT]i?B)\b/i.exec(String(t || ""));
+  if (!m) return null;
+  const u = { B: 1, KB: 1024, MB: 1048576, GB: 1073741824, TB: 1099511627776 };
+  return (
+    parseFloat(m[1].replace(",", ".")) * u[m[2].toUpperCase().replace("I", "")]
+  );
+}
+function rssStats(a) {
+  const txt = String(a.description || "").replace(/<[^>]*>/g, " ");
+  let size = null,
+    seeds = null,
+    leech = null;
+  for (const k of [
+    "size",
+    "length",
+    "contentLength",
+    "torrentSize",
+    "fileSize",
+  ]) {
+    const v = rssNum(a[k]);
+    if (v !== null && v > 0) {
+      size = v;
+      break;
+    }
+    const x = typeof a[k] == "string" ? rssBytes(a[k]) : null;
+    if (x) {
+      size = x;
+      break;
+    }
+  }
+  if (size === null) {
+    const lab = /size\s*[:=]?\s*(\d+(?:[.,]\d+)?\s*[KMGT]?i?B)/i.exec(txt);
+    size = lab ? rssBytes(lab[1]) : rssBytes(txt);
+  }
+  if (size === null) {
+    const m = /[?&]xl=(\d+)/i.exec(String(a.torrentURL || a.link || ""));
+    m && (size = Number(m[1]));
+  }
+  for (const k of ["seeders", "seeds", "seed", "nbSeeders", "num_seeds"])
+    if ((seeds = rssNum(a[k])) !== null) break;
+  for (const k of [
+    "leechers",
+    "leeches",
+    "leech",
+    "nbLeechers",
+    "num_leechs",
+    "peers",
+  ])
+    if ((leech = rssNum(a[k])) !== null) break;
+  if (seeds === null) {
+    const m =
+      /seed(?:er)?s?\s*[:=]\s*(\d+)/i.exec(txt) ||
+      /(\d+)\s*seed(?:er)?s?\b/i.exec(txt);
+    m && (seeds = Number(m[1]));
+  }
+  if (leech === null) {
+    const m =
+      /leech(?:er)?(?:e?s)?\s*[:=]\s*(\d+)/i.exec(txt) ||
+      /(\d+)\s*leech(?:er)?(?:e?s)?\b/i.exec(txt);
+    m && (leech = Number(m[1]));
+  }
+  return size === null && seeds === null && leech === null
+    ? null
+    : { size, seeds, leech };
+}
+function qbFmt(n) {
+  if (!n) return "0 B";
+  const u = ["B", "KB", "MB", "GB", "TB"],
+    i = Math.min(u.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
+  return (n / Math.pow(1024, i)).toFixed(i ? 2 : 0) + " " + u[i];
+}
+const QB_ADD_DEF = { start: !0, pick: !0, seq: !1, flp: !1, skip: !1, tmm: !1 };
+function qbLoadOpts() {
+  try {
+    return {
+      ...QB_ADD_DEF,
+      ...JSON.parse(localStorage.getItem("qb_add_opts") || "{}"),
     };
-  return d.jsx("div", {
-    className: "max-w-md mx-auto space-y-4",
-    children: d.jsxs(jt, {
-      children: [
-        d.jsx(Un, { children: d.jsx(Ln, { children: "Add Torrent" }) }),
-        d.jsxs(Tt, {
-          children: [
-            d.jsxs("div", {
-              className: "flex gap-2 mb-4",
-              children: [
-                d.jsxs(Se, {
-                  variant: n === "url" ? "default" : "outline",
-                  onClick: () => l("url"),
-                  className: "flex-1",
-                  children: [d.jsx(kN, { className: "h-4 w-4 mr-2" }), "URL"],
+  } catch {
+    return { ...QB_ADD_DEF };
+  }
+}
+function qbCheck(id, label, checked, onChange) {
+  return qbE(
+    "div",
+    {
+      className: "flex items-center",
+      style: { gap: "10px", minHeight: "24px" },
+    },
+    d.jsx(ln, { id, checked, onCheckedChange: (v) => onChange(v === !0) }),
+    d.jsx(Le, { htmlFor: id, children: label }),
+  );
+}
+async function qbHashCall(paths, hashes) {
+  const p = new URLSearchParams();
+  p.append("hashes", hashes);
+  let last;
+  for (const path of paths) {
+    try {
+      return await ze.request(path, { method: "POST", body: p });
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
+}
+const qbStop = (h) =>
+  qbHashCall(["/api/v2/torrents/stop", "/api/v2/torrents/pause"], h);
+const qbStart = (h) =>
+  qbHashCall(["/api/v2/torrents/start", "/api/v2/torrents/resume"], h);
+function AA() {
+  const qc = ha(),
+    [mode, setMode] = b.useState("url"),
+    [url, setUrl] = b.useState(""),
+    [cat, setCat] = b.useState(""),
+    [path, setPath] = b.useState(""),
+    [rename, setRename] = b.useState(""),
+    [layout, setLayout] = b.useState("Original"),
+    [o, setO] = b.useState(qbLoadOpts),
+    [busy, setBusy] = b.useState(!1),
+    [fname, setFname] = b.useState(""),
+    [dlg, setDlg] = b.useState(null),
+    fileRef = b.useRef(null),
+    setOpt = (k) => (v) =>
+      setO((p) => {
+        const n = { ...p, [k]: v };
+        try {
+          localStorage.setItem("qb_add_opts", JSON.stringify(n));
+        } catch {}
+        return n;
+      }),
+    hash = dlg?.hash,
+    loaded = !!dlg?.files;
+  b.useEffect(() => {
+    if (!hash || loaded) return;
+    let dead = !1,
+      iv = null;
+    const autoStop = !!dlg?.autoStop,
+      tick = async () => {
+        try {
+          const f = await ze.getTorrentFiles(hash);
+          if (dead || !Array.isArray(f) || !f.length) return;
+          dead = !0;
+          iv && clearInterval(iv);
+          if (autoStop) {
+            try {
+              await qbStop(hash);
+            } catch {}
+          }
+          const files = f.map((x, i) => ({
+            idx: typeof x.index === "number" ? x.index : i,
+            name: x.name,
+            size: x.size,
+          }));
+          setDlg((p) =>
+            p && p.hash === hash
+              ? { ...p, files, sel: new Set(files.map((x) => x.idx)) }
+              : p,
+          );
+        } catch {}
+      };
+    iv = setInterval(tick, 1000);
+    tick();
+    return () => {
+      dead = !0;
+      iv && clearInterval(iv);
+    };
+  }, [hash, loaded]);
+  const reset = () => {
+      setUrl("");
+      setRename("");
+      (fileRef.current && (fileRef.current.value = ""), setFname(""));
+    },
+    submit = async (e) => {
+      e.preventDefault();
+      const file = mode === "file" ? fileRef.current?.files?.[0] : null,
+        link = mode === "url" ? url.trim() : "";
+      if (!file && !link) {
+        mode === "file" && nt.error("Choose a .torrent file first");
+        return;
+      }
+      setBusy(!0);
+      try {
+        const before = new Set((await ze.getTorrents()).map((t) => t.hash)),
+          pick = o.pick,
+          autoStop = pick && !file,
+          stopped = file ? pick || !o.start : autoStop ? !1 : !o.start,
+          fd = new FormData();
+        file ? fd.append("torrents", file) : fd.append("urls", link);
+        (path && fd.append("savepath", path),
+          cat && fd.append("category", cat),
+          rename && fd.append("rename", rename),
+          fd.append("stopped", String(stopped)),
+          fd.append("paused", String(stopped)),
+          fd.append("sequentialDownload", String(o.seq)),
+          fd.append("firstLastPiecePrio", String(o.flp)),
+          fd.append("skip_checking", String(o.skip)),
+          fd.append("contentLayout", layout));
+        o.tmm
+          ? fd.append("autoTMM", "true")
+          : path && fd.append("autoTMM", "false");
+        ze.checkAdd(
+          await ze.request("/api/v2/torrents/add", {
+            method: "POST",
+            body: fd,
+          }),
+        );
+        qc.invalidateQueries({ queryKey: ["torrents"] });
+        if (!pick) {
+          nt.success("Torrent added successfully");
+          reset();
+          return;
+        }
+        let found = null;
+        for (let i = 0; i < 20 && !found; i++) {
+          found = (await ze.getTorrents()).find((t) => !before.has(t.hash));
+          found || (await new Promise((r) => setTimeout(r, 500)));
+        }
+        reset();
+        if (!found) {
+          nt.error("Added, but could not open the file picker for it");
+          return;
+        }
+        setDlg({
+          hash: found.hash,
+          name: found.name,
+          files: null,
+          sel: null,
+          autoStop,
+          start: o.start,
+          saving: !1,
+        });
+      } catch (err) {
+        nt.error(err?.message || "Failed to add torrent");
+      } finally {
+        setBusy(!1);
+      }
+    },
+    cancel = async () => {
+      const h = dlg?.hash;
+      setDlg(null);
+      if (!h) return;
+      try {
+        const p = new URLSearchParams();
+        (p.append("hashes", h), p.append("deleteFiles", "true"));
+        await ze.request("/api/v2/torrents/delete", {
+          method: "POST",
+          body: p,
+        });
+        qc.invalidateQueries({ queryKey: ["torrents"] });
+        nt.success("Add cancelled");
+      } catch (err) {
+        nt.error(err?.message || "Could not remove the torrent");
+      }
+    },
+    confirm = async () => {
+      const { hash: h, files, sel, start } = dlg;
+      if (!sel || sel.size === 0) {
+        nt.error("Select at least one file");
+        return;
+      }
+      setDlg((p) => p && { ...p, saving: !0 });
+      try {
+        const skip = files.filter((f) => !sel.has(f.idx)).map((f) => f.idx);
+        if (skip.length) {
+          const p = new URLSearchParams();
+          (p.append("hash", h),
+            p.append("id", skip.join("|")),
+            p.append("priority", "0"));
+          await ze.request("/api/v2/torrents/filePrio", {
+            method: "POST",
+            body: p,
+          });
+        }
+        start && (await qbStart(h));
+        qc.invalidateQueries({ queryKey: ["torrents"] });
+        nt.success(start ? "Torrent added" : "Torrent added (stopped)");
+        setDlg(null);
+      } catch (err) {
+        nt.error(err?.message || "Failed to apply file selection");
+        setDlg((p) => p && { ...p, saving: !1 });
+      }
+    },
+    toggle = (idx, on) =>
+      setDlg((p) => {
+        const s = new Set(p.sel);
+        on ? s.add(idx) : s.delete(idx);
+        return { ...p, sel: s };
+      }),
+    selSize = dlg?.files
+      ? dlg.files
+          .filter((f) => dlg.sel.has(f.idx))
+          .reduce((a, f) => a + f.size, 0)
+      : 0,
+    field = (id, label, node) =>
+      qbE(
+        "div",
+        { className: "space-y-2" },
+        d.jsx(Le, { htmlFor: id, children: label }),
+        node,
+      );
+  return qbE(
+    "div",
+    { className: "max-w-lg mx-auto space-y-4" },
+    qbE(
+      jt,
+      {},
+      d.jsx(Un, { children: d.jsx(Ln, { children: "Add Torrent" }) }),
+      qbE(
+        Tt,
+        {},
+        qbE(
+          "div",
+          { className: "flex gap-2 mb-4" },
+          qbE(
+            Se,
+            {
+              type: "button",
+              variant: mode === "url" ? "default" : "outline",
+              size: "sm",
+              onClick: () => setMode("url"),
+              className: "flex-1",
+            },
+            d.jsx(kN, { className: "h-4 w-4 mr-2" }),
+            "URL",
+          ),
+          qbE(
+            Se,
+            {
+              type: "button",
+              variant: mode === "file" ? "default" : "outline",
+              size: "sm",
+              onClick: () => setMode("file"),
+              className: "flex-1",
+            },
+            d.jsx(Jd, { className: "h-4 w-4 mr-2" }),
+            "File",
+          ),
+        ),
+        qbE(
+          "form",
+          { onSubmit: submit, className: "space-y-4" },
+          mode === "url"
+            ? field(
+                "url",
+                "Torrent URL (magnet or http)",
+                d.jsx(tt, {
+                  id: "url",
+                  placeholder: "magnet:?xt=...",
+                  value: url,
+                  onChange: (e) => setUrl(e.target.value),
+                  required: !0,
                 }),
-                d.jsxs(Se, {
-                  variant: n === "file" ? "default" : "outline",
-                  onClick: () => l("file"),
-                  className: "flex-1",
-                  children: [d.jsx(Jd, { className: "h-4 w-4 mr-2" }), "File"],
-                }),
-              ],
+              )
+            : field(
+                "file",
+                "Torrent File",
+                qbE(
+                  "div",
+                  {
+                    style: {
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      minWidth: 0,
+                    },
+                  },
+                  d.jsx("input", {
+                    id: "file",
+                    type: "file",
+                    accept: ".torrent",
+                    ref: fileRef,
+                    style: { display: "none" },
+                    onChange: (e) => setFname(e.target.files?.[0]?.name || ""),
+                  }),
+                  d.jsx(Se, {
+                    type: "button",
+                    variant: "outline",
+                    size: "sm",
+                    onClick: () => fileRef.current?.click(),
+                    children: "Browse...",
+                  }),
+                  d.jsx("span", {
+                    className: "text-sm text-muted-foreground",
+                    style: {
+                      flex: "1 1 0%",
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    },
+                    children: fname || "No file selected",
+                  }),
+                ),
+              ),
+          field(
+            "category",
+            "Category",
+            d.jsx(tt, {
+              id: "category",
+              placeholder: "e.g. movies",
+              value: cat,
+              onChange: (e) => setCat(e.target.value),
             }),
-            n === "url"
-              ? d.jsxs("form", {
-                  onSubmit: x,
-                  className: "space-y-4",
-                  children: [
-                    d.jsxs("div", {
-                      className: "space-y-2",
-                      children: [
-                        d.jsx(Le, {
-                          htmlFor: "url",
-                          children: "Torrent URL (magnet or http)",
-                        }),
-                        d.jsx(tt, {
-                          id: "url",
-                          type: "url",
-                          placeholder: "magnet:?xt=...",
-                          value: s,
-                          onChange: (w) => i(w.target.value),
-                          required: !0,
-                        }),
-                      ],
-                    }),
-                    d.jsxs("div", {
-                      className: "space-y-2",
-                      children: [
-                        d.jsx(Le, {
-                          htmlFor: "category",
-                          children: "Category",
-                        }),
-                        d.jsx(tt, {
-                          id: "category",
-                          placeholder: "e.g. movies",
-                          value: c,
-                          onChange: (w) => f(w.target.value),
-                        }),
-                      ],
-                    }),
-                    d.jsxs("div", {
-                      className: "space-y-2",
-                      children: [
-                        d.jsx(Le, {
-                          htmlFor: "savePath",
-                          children: "Save Path",
-                        }),
-                        d.jsx(tt, {
-                          id: "savePath",
-                          placeholder: "Leave empty for default",
-                          value: h,
-                          onChange: (w) => m(w.target.value),
-                        }),
-                      ],
-                    }),
-                    d.jsxs(Se, {
-                      type: "submit",
-                      className: "w-full",
-                      disabled: p.isPending,
-                      children: [
-                        p.isPending &&
-                          d.jsx(ko, { className: "mr-2 h-4 w-4 animate-spin" }),
-                        "Add Torrent",
-                      ],
-                    }),
-                  ],
-                })
-              : d.jsxs("form", {
-                  onSubmit: g,
-                  className: "space-y-4",
-                  children: [
-                    d.jsxs("div", {
-                      className: "space-y-2",
-                      children: [
-                        d.jsx(Le, {
-                          htmlFor: "file",
-                          children: "Torrent File",
-                        }),
-                        d.jsx(tt, {
-                          id: "file",
-                          type: "file",
-                          accept: ".torrent",
-                          ref: y,
-                          className: "cursor-pointer",
-                        }),
-                      ],
-                    }),
-                    d.jsxs("div", {
-                      className: "space-y-2",
-                      children: [
-                        d.jsx(Le, {
-                          htmlFor: "category2",
-                          children: "Category",
-                        }),
-                        d.jsx(tt, {
-                          id: "category2",
-                          placeholder: "e.g. movies",
-                          value: c,
-                          onChange: (w) => f(w.target.value),
-                        }),
-                      ],
-                    }),
-                    d.jsxs("div", {
-                      className: "space-y-2",
-                      children: [
-                        d.jsx(Le, {
-                          htmlFor: "savePath2",
-                          children: "Save Path",
-                        }),
-                        d.jsx(tt, {
-                          id: "savePath2",
-                          placeholder: "Leave empty for default",
-                          value: h,
-                          onChange: (w) => m(w.target.value),
-                        }),
-                      ],
-                    }),
-                    d.jsxs(Se, {
-                      type: "submit",
-                      className: "w-full",
-                      disabled: p.isPending,
-                      children: [
-                        p.isPending &&
-                          d.jsx(ko, { className: "mr-2 h-4 w-4 animate-spin" }),
-                        "Add Torrent",
-                      ],
-                    }),
-                  ],
+          ),
+          field(
+            "savePath",
+            "Save Path",
+            d.jsx(tt, {
+              id: "savePath",
+              placeholder: "Leave empty for default",
+              value: path,
+              onChange: (e) => setPath(e.target.value),
+            }),
+          ),
+          field(
+            "rename",
+            "Rename torrent (optional)",
+            d.jsx(tt, {
+              id: "rename",
+              value: rename,
+              onChange: (e) => setRename(e.target.value),
+            }),
+          ),
+          field(
+            "layout",
+            "Content layout",
+            qbE(
+              "select",
+              {
+                id: "layout",
+                className:
+                  "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm",
+                value: layout,
+                onChange: (e) => setLayout(e.target.value),
+              },
+              d.jsx("option", { value: "Original", children: "Original" }),
+              d.jsx("option", {
+                value: "Subfolder",
+                children: "Create subfolder",
+              }),
+              d.jsx("option", {
+                value: "NoSubfolder",
+                children: "Don't create subfolder",
+              }),
+            ),
+          ),
+          qbE(
+            "div",
+            {
+              className: "rounded-md border",
+              style: {
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+                padding: "16px",
+              },
+            },
+            qbCheck(
+              "o-pick",
+              "Choose files before downloading",
+              o.pick,
+              setOpt("pick"),
+            ),
+            qbCheck("o-start", "Start torrent", o.start, setOpt("start")),
+            qbCheck(
+              "o-seq",
+              "Download in sequential order",
+              o.seq,
+              setOpt("seq"),
+            ),
+            qbCheck(
+              "o-flp",
+              "Download first and last pieces first",
+              o.flp,
+              setOpt("flp"),
+            ),
+            qbCheck("o-skip", "Skip hash check", o.skip, setOpt("skip")),
+            qbCheck(
+              "o-tmm",
+              "Automatic torrent management",
+              o.tmm,
+              setOpt("tmm"),
+            ),
+          ),
+          qbE(
+            Se,
+            { type: "submit", className: "w-full", disabled: busy },
+            busy && d.jsx(ko, { className: "mr-2 h-4 w-4 animate-spin" }),
+            "Add Torrent",
+          ),
+        ),
+      ),
+    ),
+    qbE(
+      Wo,
+      {
+        open: !!dlg,
+        onOpenChange: (v) => {
+          !v && !dlg?.saving && cancel();
+        },
+      },
+      qbE(
+        ec,
+        { className: "sm:max-w-2xl" },
+        qbE(
+          tc,
+          {},
+          d.jsx(nc, { children: "Select files to download" }),
+          d.jsx(W0, { className: "break-all", children: dlg?.name || "" }),
+        ),
+        !dlg?.files
+          ? qbE(
+              "div",
+              {
+                className:
+                  "flex items-center gap-2 py-8 justify-center text-sm text-muted-foreground",
+              },
+              d.jsx(ko, { className: "h-4 w-4 animate-spin" }),
+              "Fetching metadata...",
+            )
+          : qbE(
+              "div",
+              { className: "space-y-3" },
+              qbE(
+                "div",
+                { className: "flex flex-wrap items-center gap-2 text-sm" },
+                d.jsx(Se, {
+                  type: "button",
+                  size: "sm",
+                  variant: "outline",
+                  onClick: () =>
+                    setDlg((p) => ({
+                      ...p,
+                      sel: new Set(p.files.map((f) => f.idx)),
+                    })),
+                  children: "All",
                 }),
-          ],
-        }),
-      ],
-    }),
-  });
+                d.jsx(Se, {
+                  type: "button",
+                  size: "sm",
+                  variant: "outline",
+                  onClick: () => setDlg((p) => ({ ...p, sel: new Set() })),
+                  children: "None",
+                }),
+                d.jsx(Se, {
+                  type: "button",
+                  size: "sm",
+                  variant: "outline",
+                  onClick: () =>
+                    setDlg((p) => ({
+                      ...p,
+                      sel: new Set(
+                        p.files
+                          .filter((f) => !p.sel.has(f.idx))
+                          .map((f) => f.idx),
+                      ),
+                    })),
+                  children: "Invert",
+                }),
+                qbE(
+                  "span",
+                  { className: "ml-auto text-muted-foreground" },
+                  dlg.sel.size,
+                  " / ",
+                  dlg.files.length,
+                  " files, ",
+                  qbFmt(selSize),
+                ),
+              ),
+              d.jsx("div", {
+                className: "overflow-y-auto rounded-md border divide-y",
+                style: { maxHeight: "50vh" },
+                children: dlg.files.map((f) =>
+                  qbE(
+                    "label",
+                    {
+                      key: f.idx,
+                      className:
+                        "flex items-start gap-2 p-2 text-xs cursor-pointer hover:bg-muted/50",
+                    },
+                    d.jsx("input", {
+                      type: "checkbox",
+                      className: "mt-0.5",
+                      checked: dlg.sel.has(f.idx),
+                      onChange: (e) => toggle(f.idx, e.target.checked),
+                    }),
+                    d.jsx("span", {
+                      className: "flex-1 break-all",
+                      children: f.name,
+                    }),
+                    d.jsx("span", {
+                      className: "shrink-0 text-muted-foreground",
+                      children: qbFmt(f.size),
+                    }),
+                  ),
+                ),
+              }),
+            ),
+        qbE(
+          J0,
+          {},
+          d.jsx(Se, {
+            variant: "outline",
+            disabled: dlg?.saving,
+            onClick: cancel,
+            children: "Cancel",
+          }),
+          d.jsx(Se, {
+            disabled: !dlg?.files || dlg?.saving || dlg?.sel?.size === 0,
+            onClick: confirm,
+            children: dlg?.start ? "Download" : "Add (stopped)",
+          }),
+        ),
+      ),
+    ),
+  );
 }
 const RssRefreshIcon = ke("refresh-cw", [
   [
@@ -26019,6 +26744,40 @@ const RssRefreshIcon = ke("refresh-cw", [
   ],
   ["path", { d: "M8 16H3v5", key: "1cv678" }],
 ]);
+const RssEditIcon = ke("pencil", [
+  [
+    "path",
+    {
+      d: "M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z",
+      key: "1a8usu",
+    },
+  ],
+  ["path", { d: "m15 5 4 4", key: "1mk7zo" }],
+]);
+function rssHost(u) {
+  try {
+    return new URL(u).hostname.replace(/^www\./, "");
+  } catch {
+    return String(u || "").trim();
+  }
+}
+function rssAutoName(url, feeds, selfPath) {
+  const base = rssHost(url) || "Feed",
+    taken = new Set(
+      feeds.filter((f) => f.path !== selfPath).map((f) => f.path),
+    );
+  let n = base,
+    i = 2;
+  while (taken.has(n)) n = base + " (" + i++ + ")";
+  return n;
+}
+function rssIsAuto(f) {
+  const base = String(f.name).replace(/ \(\d+\)$/, "");
+  return base === rssHost(f.url) || f.name === f.url;
+}
+function rssLabel(f) {
+  return rssIsAuto(f) ? f.title || f.name : f.name;
+}
 function rssFlatten(tree, prefix) {
   const out = [];
   if (!tree || typeof tree !== "object") return out;
@@ -26053,17 +26812,36 @@ function rssText(v) {
     .replace(/\s+/g, " ")
     .trim();
 }
+function rssDesc(a) {
+  let t = rssText(a.description);
+  const ti = rssText(a.title);
+  if (ti && t) {
+    const i = t.toLowerCase().indexOf(ti.toLowerCase());
+    i >= 0 && (t = t.slice(0, i) + " " + t.slice(i + ti.length));
+    t = t
+      .replace(/\s+/g, " ")
+      .replace(
+        /^[\s\-\u2013\u2014:|\u2022\u00b7,]+|[\s\-\u2013\u2014:|\u2022\u00b7,]+$/g,
+        "",
+      )
+      .trim();
+  }
+  return t;
+}
 function RA() {
   const [sel, setSel] = b.useState(null),
     [url, setUrl] = b.useState(""),
     [feedName, setFeedName] = b.useState(""),
-    [addOpen, setAddOpen] = b.useState(!1);
+    [addOpen, setAddOpen] = b.useState(!1),
+    [editF, setEditF] = b.useState(null),
+    [delF, setDelF] = b.useState(null);
   const { data: tree, isLoading: loading, error: loadError } = gA(),
     { data: prefs } = yA();
   const addFeed = bA(),
     removeFeed = xA(),
     refreshFeeds = rssRefreshHook(),
     markRead = rssMarkReadHook(),
+    editFeed = rssEditHook(),
     enableRss = rssEnableHook(),
     addTorrent = fA();
   const feeds = b.useMemo(() => rssFlatten(tree), [tree]);
@@ -26078,12 +26856,77 @@ function RA() {
     [current],
   );
   const unreadOf = (f) => f.articles.filter((a) => !a.isRead).length;
+  const qbFeedRef = b.useRef(null),
+    qbSnapTimer = b.useRef(0),
+    [qbFeedMax, qbSetFeedMax] = b.useState(null),
+    qbMobile = () => window.matchMedia("(max-width: 767px)").matches,
+    qbOnFeedScroll = () => {
+      if (!qbMobile()) return;
+      clearTimeout(qbSnapTimer.current);
+      qbSnapTimer.current = setTimeout(() => {
+        const el = qbFeedRef.current,
+          inner = el && el.firstElementChild;
+        if (!inner || !inner.children.length) return;
+        const mid = el.getBoundingClientRect().left + el.clientWidth / 2;
+        let best = 0,
+          bd = 1e9;
+        for (let i = 0; i < inner.children.length; i++) {
+          const r = inner.children[i].getBoundingClientRect(),
+            dd = Math.abs(r.left + r.width / 2 - mid);
+          dd < bd && ((bd = dd), (best = i));
+        }
+        const f = feeds[best];
+        f && f.path !== sel && setSel(f.path);
+      }, 140);
+    };
+  b.useEffect(() => {
+    const el = qbFeedRef.current,
+      inner = el && el.firstElementChild,
+      fit = () => {
+        if (!inner || inner.children.length <= 2 || qbMobile())
+          return qbSetFeedMax(null);
+        const a = inner.children[0],
+          c = inner.children[1];
+        qbSetFeedMax(c.offsetTop + c.offsetHeight - a.offsetTop + 2);
+      };
+    if ((fit(), !inner)) return;
+    const ro = typeof ResizeObserver < "u" ? new ResizeObserver(fit) : null;
+    return (
+      ro && ro.observe(inner),
+      window.addEventListener("resize", fit),
+      () => {
+        (ro && ro.disconnect(), window.removeEventListener("resize", fit));
+      }
+    );
+  }, [feeds.length, loading]);
+  b.useEffect(() => {
+    !loading &&
+      feeds.length &&
+      !feeds.some((f) => f.path === sel) &&
+      qbMobile() &&
+      setSel(feeds[0].path);
+  }, [loading, feeds, sel]);
+  b.useEffect(() => {
+    if (!qbMobile()) return;
+    const el = qbFeedRef.current,
+      inner = el && el.firstElementChild,
+      c = inner && inner.children[feeds.findIndex((f) => f.path === sel)];
+    if (!c) return;
+    const er = el.getBoundingClientRect(),
+      cr = c.getBoundingClientRect(),
+      t = el.scrollLeft + (cr.left - er.left) - (er.width - cr.width) / 2;
+    Math.abs(t - el.scrollLeft) > 2 &&
+      el.scrollTo({ left: t, behavior: "smooth" });
+  }, [sel, feeds.length, loading]);
   const submit = async (e) => {
     e.preventDefault();
     const u = url.trim();
     if (!u) return;
     try {
-      await addFeed.mutateAsync({ url: u, path: feedName.trim() });
+      await addFeed.mutateAsync({
+        url: u,
+        path: feedName.trim() || rssAutoName(u, feeds),
+      });
       setUrl("");
       setFeedName("");
       setAddOpen(!1);
@@ -26092,8 +26935,33 @@ function RA() {
       nt.error("Failed to add feed" + (x && x.message ? ": " + x.message : ""));
     }
   };
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    if (!editF) return;
+    const u = editF.url.trim();
+    if (!u) return;
+    const prefix = editF.path.includes("\\")
+        ? editF.path.slice(0, editF.path.lastIndexOf("\\") + 1)
+        : "",
+      np = prefix + (editF.name.trim() || rssAutoName(u, feeds, editF.path));
+    try {
+      await editFeed.mutateAsync({
+        path: editF.path,
+        url: u,
+        oldUrl: editF.oldUrl,
+        newPath: np,
+      });
+      (sel === editF.path && setSel(np),
+        setEditF(null),
+        nt.success("Feed updated"));
+    } catch (x) {
+      nt.error(
+        "Failed to update feed" + (x && x.message ? ": " + x.message : ""),
+      );
+    }
+  };
   const remove = async (p) => {
-    if (!window.confirm("Remove this feed?\n\n" + p)) return;
+    setDelF(null);
     try {
       await removeFeed.mutateAsync(p);
       sel === p && setSel(null);
@@ -26191,6 +27059,7 @@ function RA() {
                         size: "sm",
                         variant: "outline",
                         title: "Refresh all feeds",
+                        className: "qb-act",
                         disabled: refreshFeeds.isPending || feeds.length === 0,
                         onClick: refreshAll,
                         children: d.jsx(RssRefreshIcon, {
@@ -26207,6 +27076,7 @@ function RA() {
                               size: "sm",
                               variant: "outline",
                               title: "Add feed",
+                              className: "qb-act",
                               children: d.jsx(VN, { className: "h-4 w-4" }),
                             }),
                           }),
@@ -26254,68 +27124,120 @@ function RA() {
                     className: "text-sm text-muted-foreground",
                     children: "No feeds configured",
                   })
-                : feeds.map((f) => {
-                    const unread = unreadOf(f);
-                    return d.jsx(
-                      jt,
-                      {
-                        className:
-                          "cursor-pointer " +
-                          (sel === f.path ? "border-primary" : ""),
-                        onClick: () => setSel(f.path),
-                        children: d.jsx(Tt, {
-                          className: "p-3",
-                          children: d.jsxs("div", {
-                            className: "flex items-start justify-between",
-                            children: [
-                              d.jsxs("div", {
-                                className: "min-w-0 flex-1",
+                : d.jsx("div", {
+                    ref: qbFeedRef,
+                    className: "qb-feedbox",
+                    onScroll: qbOnFeedScroll,
+                    style: qbFeedMax
+                      ? { maxHeight: qbFeedMax, overflowY: "auto" }
+                      : void 0,
+                    children: d.jsx("div", {
+                      className: "space-y-2 qb-feedlist",
+                      children: feeds.map((f) => {
+                        const unread = unreadOf(f);
+                        return d.jsx(
+                          jt,
+                          {
+                            className:
+                              "cursor-pointer qb-fcard " +
+                              (sel === f.path ? "border-primary" : ""),
+                            onClick: () => setSel(f.path),
+                            children: d.jsx(Tt, {
+                              className: "p-3",
+                              children: d.jsxs("div", {
+                                className: "flex items-center justify-between",
                                 children: [
-                                  d.jsx("p", {
-                                    className: "font-medium text-sm truncate",
-                                    children: f.title || f.name,
+                                  d.jsxs("div", {
+                                    className: "min-w-0 flex-1",
+                                    children: [
+                                      d.jsx("p", {
+                                        className:
+                                          "font-medium text-sm truncate",
+                                        children: rssLabel(f),
+                                      }),
+                                      d.jsx("p", {
+                                        className:
+                                          "text-xs text-muted-foreground truncate",
+                                        children: f.url,
+                                      }),
+                                      f.hasError &&
+                                        d.jsx("p", {
+                                          className: "text-xs text-red-500",
+                                          children: "Error fetching feed",
+                                        }),
+                                      f.isLoading &&
+                                        d.jsx("p", {
+                                          className:
+                                            "text-xs text-muted-foreground",
+                                          children: "Loading...",
+                                        }),
+                                      unread > 0 &&
+                                        d.jsx("span", {
+                                          className:
+                                            "text-xs bg-primary text-primary-foreground rounded",
+                                          style: { padding: "1px 6px" },
+                                          children: unread,
+                                        }),
+                                    ],
                                   }),
-                                  d.jsx("p", {
-                                    className:
-                                      "text-xs text-muted-foreground truncate",
-                                    children: f.url,
-                                  }),
-                                  f.hasError &&
-                                    d.jsx("p", {
-                                      className: "text-xs text-red-500",
-                                      children: "Error fetching feed",
-                                    }),
-                                  f.isLoading &&
-                                    d.jsx("p", {
-                                      className:
-                                        "text-xs text-muted-foreground",
-                                      children: "Loading...",
-                                    }),
-                                  unread > 0 &&
-                                    d.jsx("span", {
-                                      className:
-                                        "text-xs bg-primary text-primary-foreground rounded",
-                                      style: { padding: "1px 6px" },
-                                      children: unread,
-                                    }),
+                                  qbE(
+                                    "div",
+                                    {
+                                      style: {
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "flex-end",
+                                        flexShrink: 0,
+                                        marginLeft: 8,
+                                      },
+                                    },
+                                    qbE(
+                                      "button",
+                                      {
+                                        type: "button",
+                                        className: "qb-ib",
+                                        title: "Edit feed",
+                                        onClick: (e) => {
+                                          (e.stopPropagation(),
+                                            setEditF({
+                                              path: f.path,
+                                              url: f.url,
+                                              oldUrl: f.url,
+                                              name: rssIsAuto(f) ? "" : f.name,
+                                            }));
+                                        },
+                                      },
+                                      d.jsx(RssEditIcon, {
+                                        className: "h-3.5 w-3.5",
+                                      }),
+                                      d.jsx("span", { children: "Edit" }),
+                                    ),
+                                    qbE(
+                                      "button",
+                                      {
+                                        type: "button",
+                                        className: "qb-ib qb-ib-danger",
+                                        title: "Remove feed",
+                                        onClick: (e) => {
+                                          (e.stopPropagation(),
+                                            setDelF({
+                                              path: f.path,
+                                              label: rssLabel(f),
+                                            }));
+                                        },
+                                      },
+                                      d.jsx(zs, { className: "h-3.5 w-3.5" }),
+                                      d.jsx("span", { children: "Remove" }),
+                                    ),
+                                  ),
                                 ],
                               }),
-                              d.jsx(Se, {
-                                variant: "ghost",
-                                size: "icon",
-                                className: "h-8 w-8",
-                                title: "Remove feed",
-                                onClick: (e) => {
-                                  (e.stopPropagation(), remove(f.path));
-                                },
-                                children: d.jsx(zs, { className: "h-4 w-4" }),
-                              }),
-                            ],
-                          }),
-                        }),
-                      },
-                      f.path,
-                    );
+                            }),
+                          },
+                          f.path,
+                        );
+                      }),
+                    }),
                   }),
             ],
           }),
@@ -26330,17 +27252,18 @@ function RA() {
                       children: [
                         d.jsx("h2", {
                           className: "text-lg font-semibold truncate",
-                          children: current.title || current.name,
+                          children: rssLabel(current),
                         }),
                         unreadOf(current) > 0 &&
                           d.jsxs(Se, {
                             size: "sm",
                             variant: "outline",
                             disabled: markRead.isPending,
+                            className: "qb-quiet",
                             onClick: () =>
                               markRead.mutate({ path: current.path }),
                             children: [
-                              d.jsx(xN, { className: "h-4 w-4 mr-1" }),
+                              d.jsx(xN, { className: "h-3.5 w-3.5 mr-1" }),
                               "Mark all read",
                             ],
                           }),
@@ -26355,84 +27278,218 @@ function RA() {
                         })
                       : articles.map((a, idx) => {
                           const link = rssSafeUrl(a.link),
-                            desc = rssText(a.description);
+                            desc = rssDesc(a),
+                            dl = !!(rssSafeUrl(a.torrentURL) || link),
+                            st = rssStats(a);
                           return d.jsx(
                             jt,
                             {
-                              children: d.jsx(Tt, {
-                                className: "p-3",
-                                children: d.jsxs("div", {
-                                  className: "flex items-start gap-2",
-                                  children: [
-                                    d.jsx(KN, {
-                                      className:
-                                        "h-4 w-4 mt-1 text-muted-foreground flex-shrink-0",
-                                    }),
-                                    d.jsxs("div", {
-                                      className: "min-w-0 flex-1",
-                                      children: [
-                                        link
-                                          ? d.jsx("a", {
+                              className: "py-3 qb-rcard",
+                              "data-qb-unread": a.isRead ? "0" : "1",
+                              "data-qb-health":
+                                st == null || st.seeds == null
+                                  ? "unk"
+                                  : st.seeds >= 10
+                                    ? "good"
+                                    : st.seeds > 0
+                                      ? "ok"
+                                      : "low",
+                              style: {
+                                flexDirection: "row",
+                                alignItems: "stretch",
+                                gap: 0,
+                              },
+                              children: [
+                                d.jsx(Tt, {
+                                  className: "px-3 flex-1 min-w-0",
+                                  children: d.jsxs("div", {
+                                    className: "flex items-start gap-2",
+                                    children: [
+                                      d.jsx(KN, {
+                                        className:
+                                          "h-4 w-4 mt-1 text-muted-foreground flex-shrink-0 qb-rlogo",
+                                      }),
+                                      d.jsxs("div", {
+                                        className: "min-w-0 flex-1",
+                                        children: [
+                                          st &&
+                                            (st.seeds != null ||
+                                              st.leech != null) &&
+                                            qbE(
+                                              "div",
+                                              {
+                                                className:
+                                                  "text-[10px] text-muted-foreground qb-trow",
+                                              },
+                                              [
+                                                st.seeds != null
+                                                  ? st.seeds + " seeds"
+                                                  : null,
+                                                st.leech != null
+                                                  ? st.leech + " leeches"
+                                                  : null,
+                                              ]
+                                                .filter(Boolean)
+                                                .join(" • "),
+                                            ),
+                                          link
+                                            ? d.jsx("a", {
+                                                href: link,
+                                                target: "_blank",
+                                                rel: "noopener noreferrer",
+                                                onClick: () => readOne(a),
+                                                className:
+                                                  "text-sm hover:underline break-all " +
+                                                  (a.isRead
+                                                    ? "text-muted-foreground"
+                                                    : "font-medium"),
+                                                children: a.title,
+                                              })
+                                            : d.jsx("span", {
+                                                className:
+                                                  "text-sm break-all " +
+                                                  (a.isRead
+                                                    ? "text-muted-foreground"
+                                                    : "font-medium"),
+                                                children: a.title,
+                                              }),
+                                          (a.date || (!a.isRead && a.id)) &&
+                                            d.jsxs("div", {
+                                              className: "qb-rss-meta",
+                                              style: {
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                width: "fit-content",
+                                                maxWidth: "100%",
+                                              },
+                                              children: [
+                                                a.date &&
+                                                  d.jsx("p", {
+                                                    className:
+                                                      "text-xs text-muted-foreground",
+                                                    children: rssDate(a.date),
+                                                  }),
+                                                !a.isRead &&
+                                                  a.id &&
+                                                  qbE(
+                                                    "button",
+                                                    {
+                                                      type: "button",
+                                                      className:
+                                                        "qb-ib qb-quiet",
+                                                      style: {
+                                                        justifyContent:
+                                                          "center",
+                                                        marginTop: 2,
+                                                      },
+                                                      title: "Mark as read",
+                                                      disabled:
+                                                        markRead.isPending,
+                                                      onClick: () => readOne(a),
+                                                    },
+                                                    "Mark as read",
+                                                  ),
+                                              ],
+                                            }),
+                                          st &&
+                                            st.size != null &&
+                                            qbE(
+                                              "div",
+                                              {
+                                                className:
+                                                  "qb-meta text-xs text-muted-foreground",
+                                                style: {
+                                                  display: "flex",
+                                                  flexWrap: "wrap",
+                                                  alignItems: "center",
+                                                  gap: 8,
+                                                  marginTop: 4,
+                                                },
+                                              },
+                                              qbE(
+                                                "span",
+                                                { className: "qb-chip" },
+                                                vo(st.size),
+                                              ),
+                                            ),
+                                          desc &&
+                                            d.jsx("p", {
+                                              className:
+                                                "text-xs text-muted-foreground mt-1 line-clamp-2",
+                                              style: { marginTop: 10 },
+                                              children: desc,
+                                            }),
+                                        ],
+                                      }),
+                                      qbE(
+                                        "div",
+                                        {
+                                          style: {
+                                            alignSelf: "center",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "flex-end",
+                                            flexShrink: 0,
+                                          },
+                                        },
+
+                                        link &&
+                                          qbE(
+                                            "a",
+                                            {
                                               href: link,
                                               target: "_blank",
                                               rel: "noopener noreferrer",
                                               onClick: () => readOne(a),
-                                              className:
-                                                "text-sm hover:underline break-all " +
-                                                (a.isRead
-                                                  ? "text-muted-foreground"
-                                                  : "font-medium"),
-                                              children: a.title,
-                                            })
-                                          : d.jsx("span", {
-                                              className:
-                                                "text-sm break-all " +
-                                                (a.isRead
-                                                  ? "text-muted-foreground"
-                                                  : "font-medium"),
-                                              children: a.title,
+                                              className: "qb-ib",
+                                              title: "Open article",
+                                            },
+                                            d.jsx($d, {
+                                              className: "h-3.5 w-3.5",
                                             }),
-                                        a.date &&
-                                          d.jsx("p", {
-                                            className:
-                                              "text-xs text-muted-foreground",
-                                            children: rssDate(a.date),
-                                          }),
-                                        desc &&
-                                          d.jsx("p", {
-                                            className:
-                                              "text-xs text-muted-foreground mt-1 line-clamp-2",
-                                            children: desc,
-                                          }),
-                                      ],
-                                    }),
-                                    (rssSafeUrl(a.torrentURL) || link) &&
-                                      d.jsx(Se, {
-                                        variant: "ghost",
-                                        size: "icon",
-                                        className: "h-8 w-8 flex-shrink-0",
+                                            d.jsx("span", { children: "Open" }),
+                                          ),
+                                      ),
+                                    ],
+                                  }),
+                                }),
+                                dl &&
+                                  qbE(
+                                    "div",
+                                    {
+                                      className: "qb-strip",
+                                      onClick: () =>
+                                        qbMobile() &&
+                                        !addTorrent.isPending &&
+                                        download(a),
+                                      style: {
+                                        flexShrink: 0,
+                                        alignSelf: "stretch",
+                                        margin: "0 .75rem 0 0",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        padding: "0 .4rem",
+                                        borderRadius: ".85rem",
+                                      },
+                                    },
+                                    qbE(
+                                      "button",
+                                      {
+                                        type: "button",
+                                        className:
+                                          "qb-ib qb-ib-light qb-strip-btn",
                                         title: "Download torrent",
                                         disabled: addTorrent.isPending,
-                                        onClick: () => download(a),
-                                        children: d.jsx(Tr, {
-                                          className: "h-4 w-4",
-                                        }),
-                                      }),
-                                    link &&
-                                      d.jsx("a", {
-                                        href: link,
-                                        target: "_blank",
-                                        rel: "noopener noreferrer",
-                                        onClick: () => readOne(a),
-                                        className:
-                                          "flex-shrink-0 flex items-center justify-center h-8 w-8",
-                                        children: d.jsx($d, {
-                                          className: "h-4 w-4",
-                                        }),
-                                      }),
-                                  ],
-                                }),
-                              }),
+                                        onClick: (e) => {
+                                          (e.stopPropagation(), download(a));
+                                        },
+                                      },
+                                      d.jsx(Tr, { className: "h-3.5 w-3.5" }),
+                                      d.jsx("span", { children: "Download" }),
+                                    ),
+                                  ),
+                              ],
                             },
                             a.id || idx,
                           );
@@ -26446,8 +27503,134 @@ function RA() {
           }),
         ],
       }),
+      d.jsx(Wo, {
+        open: !!delF,
+        onOpenChange: (o) => !o && setDelF(null),
+        children: d.jsxs(ec, {
+          className: "sm:max-w-md",
+          children: [
+            d.jsxs(tc, {
+              children: [
+                d.jsx(nc, { children: "Remove feed?" }),
+                d.jsx(W0, {
+                  className: "break-all",
+                  children: delF ? delF.label : "",
+                }),
+              ],
+            }),
+            d.jsxs(J0, {
+              children: [
+                d.jsx(Se, {
+                  variant: "outline",
+                  onClick: () => setDelF(null),
+                  children: "Cancel",
+                }),
+                d.jsx(Se, {
+                  variant: "destructive",
+                  onClick: () => delF && remove(delF.path),
+                  children: "Remove",
+                }),
+              ],
+            }),
+          ],
+        }),
+      }),
+      d.jsx(Wo, {
+        open: !!editF,
+        onOpenChange: (o) => !o && setEditF(null),
+        children: d.jsxs(ec, {
+          children: [
+            d.jsx(tc, { children: d.jsx(nc, { children: "Edit RSS Feed" }) }),
+            editF &&
+              d.jsxs("form", {
+                onSubmit: saveEdit,
+                className: "space-y-4",
+                children: [
+                  d.jsx(tt, {
+                    placeholder: "Feed URL",
+                    value: editF.url,
+                    onChange: (e) =>
+                      setEditF((q) => ({ ...q, url: e.target.value })),
+                    required: !0,
+                  }),
+                  d.jsx(tt, {
+                    placeholder: "Name (optional)",
+                    value: editF.name,
+                    onChange: (e) =>
+                      setEditF((q) => ({ ...q, name: e.target.value })),
+                  }),
+                  d.jsx(Se, {
+                    type: "submit",
+                    className: "w-full",
+                    disabled: editFeed.isPending,
+                    children: "Save",
+                  }),
+                ],
+              }),
+          ],
+        }),
+      }),
     ],
   });
+}
+function qbMagnet(u) {
+  if (typeof u !== "string" || !/^magnet:/i.test(u)) return null;
+  try {
+    const q = new URLSearchParams(u.slice(u.indexOf("?") + 1)),
+      xt = (q.getAll("xt").find((x) => /^urn:btih:/i.test(x)) || "").slice(9);
+    return { hash: xt, trackers: q.getAll("tr").length };
+  } catch {
+    return null;
+  }
+}
+function qbRow(l, v, brk) {
+  return d.jsxs("div", {
+    className: "flex justify-between",
+    style: { gap: 8 },
+    children: [
+      d.jsx("span", {
+        className: "text-muted-foreground flex-shrink-0",
+        children: l,
+      }),
+      d.jsx("span", {
+        style: brk
+          ? { minWidth: 0, textAlign: "right", wordBreak: "break-all" }
+          : { textAlign: "right" },
+        children: v,
+      }),
+    ],
+  });
+}
+function qbExtraRows(k) {
+  const m = qbMagnet(k.fileUrl),
+    out = [];
+  (k.pubDate > 0 &&
+    out.push(
+      qbRow(
+        "Posted:",
+        new Date(
+          k.pubDate > 1e11 ? k.pubDate : k.pubDate * 1e3,
+        ).toLocaleString(),
+      ),
+    ),
+    out.push(
+      qbRow(
+        "Seed/leech:",
+        k.nbLeechers > 0
+          ? (k.nbSeeders / k.nbLeechers).toFixed(1) + " : 1"
+          : k.nbSeeders > 0
+            ? "no leechers"
+            : "-",
+      ),
+    ),
+    k.fileSize > 0 &&
+      out.push(
+        qbRow("Exact size:", Number(k.fileSize).toLocaleString() + " bytes"),
+      ),
+    k.fileUrl && out.push(qbRow("Link type:", m ? "Magnet" : ".torrent file")),
+    m && m.hash && out.push(qbRow("Info hash:", m.hash, !0)),
+    m && m.trackers > 0 && out.push(qbRow("Trackers:", m.trackers)));
+  return out;
 }
 function vo(n) {
   if (n === 0) return "0 B";
@@ -26483,8 +27666,9 @@ function MA() {
             return;
           }
           let $ = 0;
-          for (; $ < 60 && !V.current; ) {
-            await new Promise((P) => setTimeout(P, 1e3));
+          const qbT0 = Date.now();
+          for (; Date.now() - qbT0 < 6e5 && !V.current; ) {
+            await new Promise((P) => setTimeout(P, $ < 30 ? 1e3 : 2e3));
             const { results: X, status: N } = await ze.getSearchResults(Z);
             if (
               (X && X.length > 0 && i(X), N === "Stopped" || N === "Completed")
@@ -26544,8 +27728,10 @@ function MA() {
         }),
       [s, y],
     ),
+    qbPg = qbPaging() === "pages",
     le = Math.ceil(H.length / Os),
-    re = H.slice((w - 1) * Os, w * Os),
+    re = qbPg ? H.slice((w - 1) * Os, w * Os) : H.slice(0, w * Os * 2),
+    qbMore = b.useRef(null),
     ie = (k) => {
       (p((S) => {
         const I = S.findIndex((e) => e.k === k);
@@ -26562,7 +27748,8 @@ function MA() {
           N = [...S];
         return (
           S[o].k === k
-            ? ((N[slot] = { k, d: S[slot].d }), (N[o] = { k: S[slot].k, d: S[o].d }))
+            ? ((N[slot] = { k, d: S[slot].d }),
+              (N[o] = { k: S[slot].k, d: S[o].d }))
             : (N[slot] = { k, d: S[slot].d }),
           N
         );
@@ -26578,43 +27765,41 @@ function MA() {
         C(1));
     },
     qbPick = (slot) =>
-      d.jsxs("div", {
-        style: { display: "flex", alignItems: "center", gap: 4 },
-        children: [
-          d.jsxs(Wd, {
-            children: [
-              d.jsx(ef, {
-                asChild: !0,
-                children: d.jsxs(Se, {
-                  variant: "outline",
-                  size: "sm",
-                  children: M[y[slot].k],
-                }),
+      qbSortWrap(
+        y[slot].d,
+        () => qbFlip(slot),
+        d.jsxs(Wd, {
+          children: [
+            d.jsx(ef, {
+              asChild: !0,
+              children: d.jsx(Se, {
+                variant: "outline",
+                size: "sm",
+                title: slot === 0 ? "Primary sort" : "Secondary sort",
+                style: QB_SORT_VAL,
+                children: M[y[slot].k],
               }),
-              d.jsx(tf, {
-                align: "start",
-                children: Object.keys(M).map((k) =>
-                  d.jsx(
-                    zt,
-                    {
-                      onClick: () => qbSetSlot(slot, k),
-                      children: M[k] + (y[slot].k === k ? " ✓" : ""),
-                    },
-                    k,
-                  ),
+            }),
+            d.jsx(tf, {
+              align: "start",
+              children: Object.keys(M).map((k) =>
+                d.jsxs(
+                  zt,
+                  {
+                    onClick: () => y[slot].k !== k && qbSetSlot(slot, k),
+                    children: [
+                      M[k],
+                      y[slot].k === k &&
+                        d.jsx(QbSortIcon, { dir: y[slot].d, mr: 0, ml: 8 }),
+                    ],
+                  },
+                  k,
                 ),
-              }),
-            ],
-          }),
-          d.jsx(Se, {
-            variant: "outline",
-            size: "sm",
-            title: "Toggle direction",
-            onClick: () => qbFlip(slot),
-            children: y[slot].d === "asc" ? "↑" : "↓",
-          }),
-        ],
-      }),
+              ),
+            }),
+          ],
+        }),
+      ),
     ind = (k) => {
       const I = y.findIndex((e) => e.k === k);
       return I < 0 ? "" : (y[I].d === "asc" ? "↑" : "↓") + (I + 1);
@@ -26658,6 +27843,20 @@ function MA() {
       siteUrl: "Source",
       pubDate: "Date",
     };
+  b.useEffect(() => {
+    if (qbPg) {
+      le > 0 && w > le && C(le);
+      return;
+    }
+    const el = qbMore.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (es) => es.some((e) => e.isIntersecting) && C((k) => k + 1),
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [re.length, H.length, w, le, qbPg]);
   return d.jsxs("div", {
     className: "space-y-4",
     children: [
@@ -26886,48 +28085,6 @@ function MA() {
                         ],
                       }),
                     }),
-                    le > 1 &&
-                      d.jsxs("div", {
-                        className:
-                          "flex items-center justify-between px-4 py-2 border-t",
-                        children: [
-                          d.jsxs("div", {
-                            className: "text-sm text-muted-foreground",
-                            children: [
-                              "Showing ",
-                              (w - 1) * Os + 1,
-                              " to ",
-                              Math.min(w * Os, H.length),
-                              " of ",
-                              H.length,
-                              " results",
-                            ],
-                          }),
-                          d.jsxs("div", {
-                            className: "flex items-center gap-2",
-                            children: [
-                              d.jsx(Se, {
-                                variant: "outline",
-                                size: "sm",
-                                onClick: () => C((k) => k - 1),
-                                disabled: w === 1,
-                                children: d.jsx(V0, { className: "h-4 w-4" }),
-                              }),
-                              d.jsxs("span", {
-                                className: "text-sm",
-                                children: ["Page ", w, " of ", le],
-                              }),
-                              d.jsx(Se, {
-                                variant: "outline",
-                                size: "sm",
-                                onClick: () => C((k) => k + 1),
-                                disabled: w === le,
-                                children: d.jsx(P0, { className: "h-4 w-4" }),
-                              }),
-                            ],
-                          }),
-                        ],
-                      }),
                   ],
                 }),
               }),
@@ -26939,7 +28096,13 @@ function MA() {
                 return d.jsx(
                   jt,
                   {
-                    className: "py-3",
+                    className: "py-3 qb-scard",
+                    "data-qb-health":
+                      k.nbSeeders >= 10
+                        ? "good"
+                        : k.nbSeeders > 0
+                          ? "ok"
+                          : "low",
                     children: d.jsxs(Tt, {
                       className: "px-3",
                       children: [
@@ -26952,7 +28115,7 @@ function MA() {
                               children: [
                                 d.jsx("div", {
                                   className:
-                                    "flex items-center justify-between text-[10px]",
+                                    "flex items-center justify-between text-[10px] qb-trow",
                                   children: d.jsxs("span", {
                                     className: "text-muted-foreground",
                                     children: [
@@ -26964,25 +28127,30 @@ function MA() {
                                   }),
                                 }),
                                 d.jsx("p", {
-                                  className:
-                                    "font-medium text-xs break-words max-w-[240px]",
+                                  className: "font-medium qb-title break-words",
+                                  style: {
+                                    maxWidth: "100%",
+                                    overflowWrap: "anywhere",
+                                  },
                                   children: k.fileName,
                                 }),
                                 d.jsxs("div", {
                                   className:
-                                    "flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5",
+                                    "flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5 qb-meta",
+                                  style: { flexWrap: "wrap" },
                                   children: [
                                     d.jsx("span", {
-                                      className: "flex-shrink-0",
+                                      className: "flex-shrink-0 qb-chip",
                                       children: vo(k.fileSize),
                                     }),
                                     d.jsx("span", {
-                                      className: "truncate",
+                                      className: "truncate qb-chip",
+                                      style: { minWidth: 0 },
                                       children: k.siteUrl,
                                     }),
                                     k.pubDate > 0 &&
                                       d.jsx("span", {
-                                        className: "flex-shrink-0",
+                                        className: "flex-shrink-0 qb-chip",
                                         children: qbDate(k.pubDate),
                                       }),
                                   ],
@@ -27037,10 +28205,12 @@ function MA() {
                                           }),
                                           d.jsx("span", {
                                             className: "truncate",
+                                            style: { minWidth: 0 },
                                             children: k.siteUrl,
                                           }),
                                         ],
                                       }),
+                                      ...qbExtraRows(k),
                                     ],
                                   }),
                               ],
@@ -27064,27 +28234,32 @@ function MA() {
                           className: "flex items-center gap-1 mt-1",
                           children: [
                             k.fileUrl &&
-                              d.jsx(Se, {
-                                variant: "ghost",
-                                size: "icon",
-                                className: "h-7 w-7",
-                                onClick: (X) => {
-                                  (X.stopPropagation(), _(k));
+                              qbE(
+                                "button",
+                                {
+                                  type: "button",
+                                  className: "qb-ib",
+                                  title: "Download",
+                                  onClick: (X) => (X.stopPropagation(), _(k)),
                                 },
-                                "aria-label": "Download",
-                                children: d.jsx(Tr, { className: "h-3 w-3" }),
-                              }),
+                                d.jsx(Tr, { className: "h-3.5 w-3.5" }),
+                                d.jsx("span", { children: "Download" }),
+                              ),
                             k.descrLink &&
-                              d.jsx("a", {
-                                href: k.descrLink,
-                                target: "_blank",
-                                rel: "noopener noreferrer",
-                                onClick: (X) => X.stopPropagation(),
-                                className:
-                                  "flex items-center justify-center w-8 h-8 rounded hover:bg-accent",
-                                "aria-label": "Open details",
-                                children: d.jsx($d, { className: "h-3 w-3" }),
-                              }),
+                              qbE(
+                                "a",
+                                {
+                                  href: k.descrLink,
+                                  target: "_blank",
+                                  rel: "noopener noreferrer",
+                                  onClick: (X) => X.stopPropagation(),
+                                  className: "qb-ib",
+                                  title: "Details",
+                                  "aria-label": "Open details",
+                                },
+                                d.jsx($d, { className: "h-3.5 w-3.5" }),
+                                d.jsx("span", { children: "Details" }),
+                              ),
                           ],
                         }),
                       ],
@@ -27094,6 +28269,56 @@ function MA() {
                 );
               }),
             }),
+            !qbPg &&
+              re.length < H.length &&
+              d.jsx("div", {
+                ref: qbMore,
+                className: "py-4 text-center text-sm text-muted-foreground",
+                children:
+                  "Loading more (" + re.length + " of " + H.length + ")",
+              }),
+            qbPg &&
+              le > 1 &&
+              d.jsxs("div", {
+                className: "flex items-center justify-between px-2",
+                style: { flexWrap: "wrap", gap: 8 },
+                children: [
+                  d.jsxs("div", {
+                    className: "text-sm text-muted-foreground",
+                    children: [
+                      "Showing ",
+                      (w - 1) * Os + 1,
+                      " to ",
+                      Math.min(w * Os, H.length),
+                      " of ",
+                      H.length,
+                    ],
+                  }),
+                  d.jsxs("div", {
+                    className: "flex items-center gap-2",
+                    children: [
+                      d.jsx(Se, {
+                        variant: "outline",
+                        size: "sm",
+                        onClick: () => C((k) => k - 1),
+                        disabled: w === 1,
+                        children: d.jsx(V0, { className: "h-4 w-4" }),
+                      }),
+                      d.jsxs("span", {
+                        className: "text-sm",
+                        children: ["Page ", w, " of ", le],
+                      }),
+                      d.jsx(Se, {
+                        variant: "outline",
+                        size: "sm",
+                        onClick: () => C((k) => k + 1),
+                        disabled: w === le,
+                        children: d.jsx(P0, { className: "h-4 w-4" }),
+                      }),
+                    ],
+                  }),
+                ],
+              }),
           ],
         }),
       d.jsx(Wo, {
@@ -27196,10 +28421,298 @@ function DA({ className: n, orientation: l = "vertical", ...s }) {
 function zA(n) {
   return new Date(n > 1e11 ? n : n * 1e3).toLocaleTimeString();
 }
+async function qbCopy(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return !0;
+    }
+  } catch {}
+  try {
+    const t = document.createElement("textarea");
+    ((t.value = text),
+      (t.style.position = "fixed"),
+      (t.style.opacity = "0"),
+      document.body.appendChild(t),
+      t.focus(),
+      t.select());
+    const ok = document.execCommand("copy");
+    return (t.remove(), ok);
+  } catch {
+    return !1;
+  }
+}
+function qbLogText(s) {
+  const t = new Date(s.timestamp > 1e11 ? s.timestamp : s.timestamp * 1e3);
+  return "[" + t.toLocaleString() + "] " + s.message;
+}
+function QbSortIcon({ dir, mr = 6, ml = 0 }) {
+  const on = (x) => (dir === x ? 1 : 0.3);
+  return qbE(
+    "svg",
+    {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: 16,
+      height: 16,
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      style: { flexShrink: 0, marginRight: mr, marginLeft: ml },
+    },
+    d.jsxs("g", {
+      opacity: on("asc"),
+      children: [
+        d.jsx("path", { d: "m3 8 4-4 4 4" }),
+        d.jsx("path", { d: "M7 4v16" }),
+      ],
+    }),
+    d.jsxs("g", {
+      opacity: on("desc"),
+      children: [
+        d.jsx("path", { d: "m21 16-4 4-4-4" }),
+        d.jsx("path", { d: "M17 20V4" }),
+      ],
+    }),
+  );
+}
+function qbSortWrap(dir, onToggle, menu) {
+  return qbE(
+    "div",
+    { style: { display: "inline-flex", gap: "6px" } },
+    d.jsx(Se, {
+      variant: "outline",
+      size: "sm",
+      title: "Toggle ascending / descending",
+      "aria-label": "Toggle ascending / descending",
+      onClick: onToggle,
+      style: { paddingInline: 10 },
+      children: d.jsx(QbSortIcon, { dir, mr: 0 }),
+    }),
+    menu,
+  );
+}
+const QB_SORT_VAL = {};
+(function () {
+  try {
+    document.documentElement.setAttribute(
+      "data-qb-size",
+      localStorage.getItem("qb_ui_size") || "normal",
+    );
+  } catch {
+    document.documentElement.setAttribute("data-qb-size", "normal");
+  }
+})();
+(function () {
+  try {
+    document.documentElement.setAttribute(
+      "data-qb-labels",
+      localStorage.getItem("qb_ui_labels") || "hover",
+    );
+  } catch {
+    document.documentElement.setAttribute("data-qb-labels", "hover");
+  }
+})();
+function qbPaging() {
+  try {
+    return localStorage.getItem("qb_ui_paging") === "pages"
+      ? "pages"
+      : "infinite";
+  } catch {
+    return "infinite";
+  }
+}
+function QbPagingRow() {
+  const [v, setV] = b.useState(() => qbPaging());
+  return qbE(
+    "div",
+    { className: "flex items-center justify-between", style: { gap: "12px" } },
+    d.jsx(Le, { htmlFor: "qb_paging", children: "Long lists" }),
+    qbE(
+      "select",
+      {
+        id: "qb_paging",
+        className:
+          "flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm",
+        value: v,
+        onChange: (e) => {
+          const n = e.target.value;
+          setV(n);
+          try {
+            localStorage.setItem("qb_ui_paging", n);
+          } catch {}
+        },
+      },
+      d.jsx("option", { value: "infinite", children: "Infinite scroll" }),
+      d.jsx("option", { value: "pages", children: "Pages" }),
+    ),
+  );
+}
+function QbLabelsRow() {
+  const [v, setV] = b.useState(
+    () => document.documentElement.getAttribute("data-qb-labels") || "hover",
+  );
+  return qbE(
+    "div",
+    { className: "flex items-center justify-between", style: { gap: "12px" } },
+    d.jsx(Le, { htmlFor: "qb_labels", children: "Action button labels" }),
+    qbE(
+      "select",
+      {
+        id: "qb_labels",
+        className:
+          "flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm",
+        value: v,
+        onChange: (e) => {
+          const n = e.target.value;
+          setV(n);
+          try {
+            localStorage.setItem("qb_ui_labels", n);
+          } catch {}
+          document.documentElement.setAttribute("data-qb-labels", n);
+        },
+      },
+      d.jsx("option", {
+        value: "hover",
+        children: "Expand on hover (animated)",
+      }),
+      d.jsx("option", { value: "always", children: "Always show (static)" }),
+      d.jsx("option", { value: "none", children: "Icons only" }),
+    ),
+  );
+}
+function QbSizeRow() {
+  const [v, setV] = b.useState(
+    () => document.documentElement.getAttribute("data-qb-size") || "normal",
+  );
+  return qbE(
+    "div",
+    { className: "flex items-center justify-between", style: { gap: "12px" } },
+    d.jsx(Le, { htmlFor: "qb_size", children: "Interface size" }),
+    qbE(
+      "select",
+      {
+        id: "qb_size",
+        className:
+          "flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm",
+        value: v,
+        onChange: (e) => {
+          const n = e.target.value;
+          setV(n);
+          try {
+            localStorage.setItem("qb_ui_size", n);
+          } catch {}
+          document.documentElement.setAttribute("data-qb-size", n);
+        },
+      },
+      d.jsx("option", { value: "small", children: "Small" }),
+      d.jsx("option", { value: "normal", children: "Normal" }),
+      d.jsx("option", { value: "large", children: "Large" }),
+    ),
+  );
+}
+
+async function qbRecheckHashes(qc, hashes) {
+  try {
+    const p = new URLSearchParams();
+    p.append("hashes", hashes.join("|"));
+    await ze.request("/api/v2/torrents/recheck", { method: "POST", body: p });
+    qc.invalidateQueries({ queryKey: ["torrents"] });
+    nt.success(qbNames(qc, hashes) + " recheck started");
+  } catch {
+    nt.error("Failed to start recheck");
+  }
+}
+function QbLogsHeader({ n, extra = 0 }) {
+  return d.jsxs(Un, {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: "8px",
+      padding:
+        "0 calc(1rem + var(--qb-title) + .4rem + " +
+        extra +
+        "px) 0 calc(1rem + var(--qb-title) + .4rem)",
+    },
+    children: [
+      d.jsx(Ln, { children: "Logs" }),
+      d.jsxs(Se, {
+        variant: "outline",
+        size: "sm",
+        className: "qb-quiet",
+        onClick: async () =>
+          (await qbCopy(n.map(qbLogText).join("\n")))
+            ? nt.success("Copied " + n.length + " log lines")
+            : nt.error("Could not copy"),
+        children: [d.jsx(Hg, { className: "h-3.5 w-3.5 mr-1.5" }), "Copy all"],
+      }),
+    ],
+  });
+}
+function QbLogLine({ s }) {
+  const [hov, setHov] = b.useState(!1),
+    touch =
+      typeof matchMedia === "function" && matchMedia("(hover: none)").matches,
+    show = hov || touch;
+  return qbE(
+    "div",
+    {
+      className: "flex items-start",
+      onMouseEnter: () => setHov(!0),
+      onMouseLeave: () => setHov(!1),
+      style: {
+        minWidth: 0,
+        gap: ".4rem",
+        padding: ".25rem 0",
+        fontSize: "var(--qb-title)",
+      },
+    },
+    d.jsx("button", {
+      type: "button",
+      title: "Copy this line",
+      "aria-label": "Copy this line",
+      onClick: async () =>
+        (await qbCopy(qbLogText(s)))
+          ? nt.success("Log line copied")
+          : nt.error("Could not copy"),
+      style: {
+        flexShrink: 0,
+        width: "var(--qb-title)",
+        height: "1.3em",
+        padding: 0,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: show ? (hov ? 0.9 : 0.45) : 0,
+        pointerEvents: show ? "auto" : "none",
+        transition: "opacity 0.15s",
+        cursor: "pointer",
+      },
+      children: d.jsx(Hg, {
+        style: { width: "var(--qb-title)", height: "var(--qb-title)" },
+      }),
+    }),
+    d.jsx("span", {
+      className: "text-muted-foreground whitespace-nowrap",
+      style: { flexShrink: 0 },
+      children: zA(s.timestamp),
+    }),
+    d.jsx("span", {
+      className: "break-all",
+      style: { flex: "1 1 0%", minWidth: 0 },
+      children: s.message,
+    }),
+  );
+}
 function kA() {
   const { data: n, isLoading: l } = SA(),
     qbRef = b.useRef(null),
-    [qbH, qbSetH] = b.useState(null);
+    [qbH, qbSetH] = b.useState(null),
+    qbScRef = b.useRef(null),
+    [qbSb, qbSetSb] = b.useState(0);
   return (
     b.useEffect(() => {
       const fit = () => {
@@ -27220,6 +28733,17 @@ function kA() {
       );
     }, [l, n]),
     b.useEffect(() => {
+      const m = () => {
+        const e = qbScRef.current;
+        e && qbSetSb(e.offsetWidth - e.clientWidth);
+      };
+      return (
+        m(),
+        window.addEventListener("resize", m),
+        () => window.removeEventListener("resize", m)
+      );
+    }, [l, n, qbH]),
+    b.useEffect(() => {
       const H = document.documentElement,
         le = document.body,
         re = [H.style.overflow, le.style.overflow];
@@ -27232,65 +28756,71 @@ function kA() {
       );
     }, []),
     l
-    ? d.jsx("div", {
-        className: "text-center py-8 text-muted-foreground",
-        children: "Loading logs...",
-      })
-    : !n || n.length === 0
       ? d.jsx("div", {
           className: "text-center py-8 text-muted-foreground",
-          children: "No logs",
+          children: "Loading logs...",
         })
-      : d.jsx("div", {
-          ref: qbRef,
-          style: { height: qbH ?? "calc(100dvh - 160px)" },
-          children: d.jsxs(jt, {
-          style: { height: "100%", overflow: "hidden" },
-          children: [
-            d.jsx(Un, { children: d.jsx(Ln, { children: "Logs" }) }),
-            d.jsx(Tt, {
-              className: "p-0",
-              style: { position: "relative", flex: "1 1 0%", minHeight: 0 },
-              children: d.jsx("div", {
-                style: {
-                  position: "absolute",
-                  top: 0,
-                  right: 0,
-                  bottom: 0,
-                  left: 0,
-                  overflowY: "auto",
-                },
-                children: d.jsx("div", {
-                  className: "p-4 space-y-1",
-                  children: n
-                    .slice(-100)
-                    .reverse()
-                    .map((s) =>
-                      d.jsxs(
-                        "div",
-                        {
-                          className: "flex items-start gap-2 py-1 text-xs",
-                          children: [
-                            d.jsx("span", {
-                              className:
-                                "text-muted-foreground text-xs whitespace-nowrap",
-                              children: zA(s.timestamp),
-                            }),
-                            d.jsx("span", {
-                              className: "break-all text-xs",
-                              children: s.message,
-                            }),
-                          ],
-                        },
-                        s.id,
-                      ),
-                    ),
+      : !n || n.length === 0
+        ? d.jsx("div", {
+            className: "text-center py-8 text-muted-foreground",
+            children: "No logs",
+          })
+        : d.jsx("div", {
+            ref: qbRef,
+            style: { height: qbH ?? "calc(100dvh - 160px)" },
+            children: d.jsxs("div", {
+              style: {
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              },
+              children: [
+                d.jsx(jt, {
+                  style: { padding: "14px 0", gap: 0, flex: "0 0 auto" },
+                  children: d.jsx(QbLogsHeader, { n, extra: qbSb }),
                 }),
-              }),
+                d.jsx(jt, {
+                  style: {
+                    flex: "1 1 0%",
+                    minHeight: 0,
+                    overflow: "hidden",
+                    padding: 0,
+                    gap: 0,
+                  },
+                  children: d.jsx(Tt, {
+                    className: "p-0",
+                    style: {
+                      position: "relative",
+                      flex: "1 1 0%",
+                      minHeight: 0,
+                    },
+                    children: d.jsx("div", {
+                      ref: qbScRef,
+                      style: {
+                        position: "absolute",
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                        left: 0,
+                        overflowY: "auto",
+                      },
+                      children: d.jsx("div", {
+                        style: {
+                          padding:
+                            ".5rem calc(1rem + var(--qb-title) + .4rem) 1rem 1rem",
+                        },
+                        children: n
+                          .slice(-100)
+                          .reverse()
+                          .map((s) => d.jsx(QbLogLine, { s }, s.id)),
+                      }),
+                    }),
+                  }),
+                }),
+              ],
             }),
-          ],
-        }),
-        })
+          })
   );
 }
 function UA({ className: n, orientation: l = "horizontal", ...s }) {
@@ -27390,6 +28920,12 @@ function HA() {
           ...A,
           start_paused_enabled:
             A.add_stopped_enabled ?? A.start_paused_enabled ?? !1,
+          qb_start_mode:
+            (A.add_stopped_enabled ?? A.start_paused_enabled ?? !1)
+              ? "paused"
+              : A.torrent_stop_condition === "MetadataReceived"
+                ? "metadata"
+                : "normal",
           create_subfolder_enabled: qbCsf,
           _csf0: qbCsf,
           dl_limit: A.dl_limit > 0 ? Math.round(A.dl_limit / 1024) : A.dl_limit,
@@ -27427,8 +28963,12 @@ function HA() {
                     : "NoSubfolder")
                 : (z.create_subfolder_enabled = c.create_subfolder_enabled),
               "add_stopped_enabled" in c
-                ? (z.add_stopped_enabled = c.start_paused_enabled)
-                : (z.start_paused_enabled = c.start_paused_enabled),
+                ? (z.add_stopped_enabled = c.qb_start_mode === "paused")
+                : (z.start_paused_enabled = c.qb_start_mode === "paused"),
+              ("torrent_stop_condition" in c ||
+                c.qb_start_mode === "metadata") &&
+                (z.torrent_stop_condition =
+                  c.qb_start_mode === "metadata" ? "MetadataReceived" : "None"),
               (z.auto_tmm_enabled = c.auto_tmm_enabled));
             break;
           case "queueing":
@@ -27572,73 +29112,114 @@ function HA() {
                           children: [
                             d.jsx(Le, {
                               htmlFor: "temp_path",
+                              className: c.temp_path_enabled
+                                ? ""
+                                : "opacity-50",
                               children: "Temp Folder",
                             }),
                             d.jsx(tt, {
                               id: "temp_path",
+                              disabled: !c.temp_path_enabled,
                               value: c.temp_path,
                               onChange: (A) => j("temp_path", A.target.value),
                               placeholder: "/downloads/temp",
                             }),
                           ],
                         }),
+                        qbE(
+                          "div",
+                          {
+                            style: {
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "8px",
+                            },
+                          },
+                          d.jsx(Le, {
+                            htmlFor: "qb_start_mode",
+                            children: "When adding a torrent",
+                          }),
+                          qbE(
+                            "select",
+                            {
+                              id: "qb_start_mode",
+                              className:
+                                "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm",
+                              value: c.qb_start_mode || "normal",
+                              onChange: (A) =>
+                                j("qb_start_mode", A.target.value),
+                            },
+                            d.jsx("option", {
+                              value: "normal",
+                              children: "Start immediately",
+                            }),
+                            d.jsx("option", {
+                              value: "metadata",
+                              children: "Pause once metadata is received",
+                            }),
+                            d.jsx("option", {
+                              value: "paused",
+                              children: "Pause immediately (no metadata fetch)",
+                            }),
+                          ),
+                          d.jsx("p", {
+                            className: "text-xs text-muted-foreground",
+                            children:
+                              "Pausing after metadata lets you pick files before anything downloads. Requires a recent qBittorrent.",
+                          }),
+                        ),
                         d.jsxs("div", {
-                          className: "flex items-center space-x-2",
+                          style: {
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "12px",
+                            marginTop: "12px",
+                          },
                           children: [
-                            d.jsx(ln, {
-                              id: "temp_path_enabled",
-                              checked: c.temp_path_enabled,
-                              onCheckedChange: (A) =>
-                                j("temp_path_enabled", !!A),
+                            d.jsxs("div", {
+                              className: "flex items-center space-x-2",
+                              children: [
+                                d.jsx(ln, {
+                                  id: "auto_tmm_enabled",
+                                  checked: c.auto_tmm_enabled,
+                                  onCheckedChange: (A) =>
+                                    j("auto_tmm_enabled", !!A),
+                                }),
+                                d.jsx(Le, {
+                                  htmlFor: "auto_tmm_enabled",
+                                  children: "Auto torrent management",
+                                }),
+                              ],
                             }),
-                            d.jsx(Le, {
-                              htmlFor: "temp_path_enabled",
-                              children: "Enable temp folder",
+                            d.jsxs("div", {
+                              className: "flex items-center space-x-2",
+                              children: [
+                                d.jsx(ln, {
+                                  id: "temp_path_enabled",
+                                  checked: c.temp_path_enabled,
+                                  onCheckedChange: (A) =>
+                                    j("temp_path_enabled", !!A),
+                                }),
+                                d.jsx(Le, {
+                                  htmlFor: "temp_path_enabled",
+                                  children: "Enable temp folder",
+                                }),
+                              ],
                             }),
-                          ],
-                        }),
-                        d.jsxs("div", {
-                          className: "flex items-center space-x-2",
-                          children: [
-                            d.jsx(ln, {
-                              id: "create_subfolder_enabled",
-                              checked: c.create_subfolder_enabled,
-                              onCheckedChange: (A) =>
-                                j("create_subfolder_enabled", !!A),
-                            }),
-                            d.jsx(Le, {
-                              htmlFor: "create_subfolder_enabled",
-                              children: "Create subfolder",
-                            }),
-                          ],
-                        }),
-                        d.jsxs("div", {
-                          className: "flex items-center space-x-2",
-                          children: [
-                            d.jsx(ln, {
-                              id: "start_paused_enabled",
-                              checked: c.start_paused_enabled,
-                              onCheckedChange: (A) =>
-                                j("start_paused_enabled", !!A),
-                            }),
-                            d.jsx(Le, {
-                              htmlFor: "start_paused_enabled",
-                              children: "Start paused",
-                            }),
-                          ],
-                        }),
-                        d.jsxs("div", {
-                          className: "flex items-center space-x-2",
-                          children: [
-                            d.jsx(ln, {
-                              id: "auto_tmm_enabled",
-                              checked: c.auto_tmm_enabled,
-                              onCheckedChange: (A) =>
-                                j("auto_tmm_enabled", !!A),
-                            }),
-                            d.jsx(Le, {
-                              htmlFor: "auto_tmm_enabled",
-                              children: "Auto torrent management",
+                            d.jsxs("div", {
+                              className: "flex items-center space-x-2",
+                              children: [
+                                d.jsx(ln, {
+                                  id: "create_subfolder_enabled",
+                                  checked: c.create_subfolder_enabled,
+                                  onCheckedChange: (A) =>
+                                    j("create_subfolder_enabled", !!A),
+                                }),
+                                d.jsx(Le, {
+                                  htmlFor: "create_subfolder_enabled",
+                                  children: "Create subfolder",
+                                }),
+                              ],
                             }),
                           ],
                         }),
@@ -27658,37 +29239,43 @@ function HA() {
                       children: [
                         d.jsx(Ln, { children: "Appearance" }),
                         d.jsx(Cr, {
-                          children: "Toggle between light and dark mode",
+                          children: "Theme, interface size and button labels",
                         }),
                       ],
                     }),
-                    d.jsx(Tt, {
-                      children: d.jsxs("div", {
-                        className: "flex items-center justify-between",
-                        children: [
-                          d.jsx(Le, { children: "Theme" }),
-                          d.jsx(Se, {
-                            variant: "outline",
-                            size: "sm",
-                            onClick: () => i(s === "dark" ? "light" : "dark"),
-                            className: "gap-2",
-                            children:
-                              s === "dark"
-                                ? d.jsxs(d.Fragment, {
-                                    children: [
-                                      d.jsx(qN, { className: "h-4 w-4" }),
-                                      d.jsx("span", { children: "Dark" }),
-                                    ],
-                                  })
-                                : d.jsxs(d.Fragment, {
-                                    children: [
-                                      d.jsx(rA, { className: "h-4 w-4" }),
-                                      d.jsx("span", { children: "Light" }),
-                                    ],
-                                  }),
-                          }),
-                        ],
-                      }),
+                    d.jsxs(Tt, {
+                      className: "space-y-4",
+                      children: [
+                        d.jsx(QbSizeRow, {}),
+                        d.jsx(QbLabelsRow, {}),
+                        d.jsx(QbPagingRow, {}),
+                        d.jsxs("div", {
+                          className: "flex items-center justify-between",
+                          children: [
+                            d.jsx(Le, { children: "Theme" }),
+                            d.jsx(Se, {
+                              variant: "outline",
+                              size: "sm",
+                              onClick: () => i(s === "dark" ? "light" : "dark"),
+                              className: "gap-2",
+                              children:
+                                s === "dark"
+                                  ? d.jsxs(d.Fragment, {
+                                      children: [
+                                        d.jsx(qN, { className: "h-4 w-4" }),
+                                        d.jsx("span", { children: "Dark" }),
+                                      ],
+                                    })
+                                  : d.jsxs(d.Fragment, {
+                                      children: [
+                                        d.jsx(rA, { className: "h-4 w-4" }),
+                                        d.jsx("span", { children: "Light" }),
+                                      ],
+                                    }),
+                            }),
+                          ],
+                        }),
+                      ],
                     }),
                   ],
                 }),

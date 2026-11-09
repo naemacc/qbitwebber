@@ -1,26 +1,37 @@
 # install-qbitopen.ps1
-# One-time setup so the new "open folder" button in the web UI can open Windows Explorer.
+# One-time setup so the "open folder" button in the web UI can open Windows Explorer.
 # No admin rights needed (registers for the current user only).
 #
 #   Install:    right-click > Run with PowerShell
 #               (or: powershell -ExecutionPolicy Bypass -File .\install-qbitopen.ps1)
 #   Uninstall:  powershell -ExecutionPolicy Bypass -File .\install-qbitopen.ps1 -Uninstall
+#   Custom dir: powershell -ExecutionPolicy Bypass -File .\install-qbitopen.ps1 -Dir 'D:\somewhere\qbitopen'
+#
+# The handler files are created in a "qbitopen" folder next to this script, so
+# nothing is written outside the folder you downloaded. That folder sits beside
+# (not inside) the "public" folder qBittorrent serves, so it is not exposed by
+# the web UI. Your path map lives in its own file (pathmap.json) and is never
+# overwritten when you re-run this installer.
 
-param([switch]$Uninstall)
+param(
+  [switch]$Uninstall,
+  [string]$Dir
+)
 
 $ErrorActionPreference = 'Stop'
-$dir  = Join-Path $env:LOCALAPPDATA 'qbitopen'
+
+if (-not $Dir) { $Dir = Join-Path $PSScriptRoot 'qbitopen' }
 $root = 'HKCU:\Software\Classes\qbitopen'
 
 if ($Uninstall) {
-    if (Test-Path $root) { Remove-Item -Path $root -Recurse -Force }
-    if (Test-Path $dir)  { Remove-Item -Path $dir  -Recurse -Force }
-    Write-Host 'Uninstalled.'
-    Read-Host 'Press Enter to close'
-    exit 0
+  if (Test-Path $root) { Remove-Item -Path $root -Recurse -Force }
+  if (Test-Path $Dir) { Remove-Item -Path $Dir -Recurse -Force }
+  Write-Host 'Uninstalled.'
+  Read-Host 'Press Enter to close'
+  exit 0
 }
 
-New-Item -ItemType Directory -Force -Path $dir | Out-Null
+New-Item -ItemType Directory -Force -Path $Dir | Out-Null
 
 # ---------------------------------------------------------------------------
 # handler.ps1 - receives  qbitopen:<url-encoded path>  and opens Explorer
@@ -28,27 +39,26 @@ New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $handler = @'
 param([string]$Url)
 
-# ---- Optional path mapping --------------------------------------------------
-# Only needed if qBittorrent does NOT run on this PC (Docker, NAS, WSL, remote
-# box), so the paths it reports do not exist on Windows. First match wins.
-# Example entries (remove the leading # and edit):
-$PathMap = @(
-    # @{ From = '/downloads';   To = 'D:\Torrents' },
-    # @{ From = '/data/media';  To = '\\NAS\media' }
-)
-# -----------------------------------------------------------------------------
-
+# Path mapping lives in pathmap.json (same folder). Only needed if qBittorrent
+# does NOT run on this PC (Docker, NAS, WSL, remote box).
+$mapFile = Join-Path $PSScriptRoot 'pathmap.json'
 $logFile = Join-Path $PSScriptRoot 'last-error.txt'
 try {
     if (-not $Url) { throw 'No URL given' }
+
+    $PathMap = @()
+    if (Test-Path -LiteralPath $mapFile) {
+        $PathMap = @(Get-Content -Raw -LiteralPath $mapFile | ConvertFrom-Json)
+    }
 
     $raw  = $Url -replace '^qbitopen:(//)?', ''
     $raw  = $raw.TrimEnd('/')
     $path = [System.Uri]::UnescapeDataString($raw)
 
     foreach ($m in $PathMap) {
-        if ($path.StartsWith($m.From, [System.StringComparison]::OrdinalIgnoreCase)) {
-            $path = $m.To + $path.Substring($m.From.Length)
+        if ($m.enabled -eq $false -or -not $m.from) { continue }
+        if ($path.StartsWith($m.from, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $path = $m.to + $path.Substring($m.from.Length)
             break
         }
     }
@@ -99,10 +109,30 @@ If WScript.Arguments.Count > 0 Then
 End If
 '@
 
-$handlerPath = Join-Path $dir 'handler.ps1'
-$vbsPath     = Join-Path $dir 'launch.vbs'
+$handlerPath = Join-Path $Dir 'handler.ps1'
+$vbsPath = Join-Path $Dir 'launch.vbs'
+$mapPath = Join-Path $Dir 'pathmap.json'
 Set-Content -Path $handlerPath -Value $handler -Encoding UTF8
-Set-Content -Path $vbsPath     -Value $vbs     -Encoding ASCII
+Set-Content -Path $vbsPath -Value $vbs -Encoding ASCII
+
+# ---------------------------------------------------------------------------
+# pathmap.json - created once, then left alone on re-installs
+# ---------------------------------------------------------------------------
+if (-not (Test-Path -LiteralPath $mapPath)) {
+  $mapText = @'
+[
+  {
+    "enabled": false,
+    "from": "/downloads",
+    "to": "D:/path/to/your/downloads"
+  }
+]
+'@
+  Set-Content -Path $mapPath -Value $mapText -Encoding UTF8
+  $mapNote = 'Created pathmap.json with a disabled example. Edit it if qBittorrent runs in Docker, on a NAS or in WSL.'
+} else {
+  $mapNote = 'Kept your existing pathmap.json.'
+}
 
 # ---------------------------------------------------------------------------
 # Register the qbitopen: URL protocol for the current user
@@ -115,13 +145,12 @@ Set-ItemProperty -Path "$root\shell\open\command" -Name '(default)' -Value ('wsc
 
 Write-Host ''
 Write-Host 'Installed.' -ForegroundColor Green
-Write-Host "Files: $dir"
+Write-Host "Files:    $Dir"
+Write-Host "Path map: $mapPath"
+Write-Host $mapNote
 Write-Host ''
-Write-Host 'First click on the folder button: your browser asks to open "qbitopen Handler".'
+Write-Host 'First click on the folder button: your browser may ask to open "qbitopen Handler".'
 Write-Host 'Tick "Always allow" and confirm - it will not ask again.'
-Write-Host ''
-Write-Host 'If qBittorrent runs on a different machine / Docker / NAS, edit $PathMap at the top of:'
-Write-Host "  $handlerPath"
-Write-Host 'If a click does nothing, check last-error.txt in the same folder.'
+Write-Host 'If a click does nothing, check last-error.txt in the Files folder.'
 Write-Host ''
 Read-Host 'Press Enter to close'
