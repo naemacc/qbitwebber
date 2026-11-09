@@ -2,6 +2,7 @@
 
 A modified fork of [ksuaning-au/qbitwebber](https://github.com/ksuaning-au/qbitwebber), a minimalist, mobile-friendly frontend for the qBittorrent web UI.
 
+> [!NOTE]
 > **This repository is an archive.** It contains only the built release (the `public` folder) plus a Windows helper script. The original TypeScript source is not included. I am not accepting issues or pull requests and don't plan to maintain it. For the source, development setup and demo mode, see the [original repository](https://github.com/ksuaning-au/qbitwebber). All credit for the app goes to its author.
 
 ## Changes from the original
